@@ -137,7 +137,7 @@ const F = [
 5: storefront dev [80x24] (cwd ${H}/storefront, pid 72900)
 6: payments-api 2 [57x47] (cwd ${H}/payments-api, pid 73631, claude idle)
 7: storefront 1 [80x24] (cwd ${H}/storefront, pid 73637, codex idle*)
-9: payments-api 3 [80x24] (cwd ${H}/payments-api, pid 75462, codex idle*, child of 6)`]] },
+9: payments-api 3 [80x24] (cwd ${H}/payments-api, pid 75462, codex idle*, child of payments-api 2 (6))`]] },
     ex: [
       { t: { es: "Arranca algo largo en una sesión, por ejemplo un servidor:", en: "Start something long-running in a session, a server for instance:" }, c: "python3 -m http.server 8000" },
       { t: { es: "Cierra jmux del todo. La ventana se va y el servidor sigue:", en: "Quit jmux entirely. The window goes; the server doesn't:" }, k: ["⌘ Q"] },
@@ -209,7 +209,7 @@ const F = [
 └─ split horizontal
    ├─ left: pane (focused)
    │  ├─ 6: payments-api 2 — ${H}/payments-api · claude idle · active
-   │  └─ 9: payments-api 3 — ${H}/payments-api · codex idle* · child of 6
+   │  └─ 9: payments-api 3 — ${H}/payments-api · codex idle* · child of payments-api 2 (6)
    └─ right: pane
       ├─ 2: payments-api 1 — ${H}/payments-api ← you
       └─ 1: dev server — ${H}/payments-api
@@ -226,6 +226,16 @@ you are session 2 "payments-api 1" — project "payments-api", right pane, tab 1
       { t: { es: "Doble clic en la pestaña o la fila, o «Rename Session»; o desde la sesión:", en: "Double-click the tab or row, or “Rename Session”; or from inside the session:" }, c: "jmux rename 'fixing refunds'" },
       { t: { es: "O renombra otra sesión:", en: "Or rename another one:" }, c: "jmux rename --session 7 'coupon rounding'" },
       { t: { es: "Dentro de Claude, <code>/rename</code> también funciona: la pestaña de jmux cambia con él.", en: "Inside Claude, <code>/rename</code> works too: jmux's tab follows it." } },
+    ] },
+  { id: "numbers", g: "workspace", kind: "claude", isNew: "0.1.320",
+    r: { es: "número de sesión", en: "session number" },
+    t: { es: "El número que dicen tus agentes, a la vista.", en: "The number your agents say, in plain sight." },
+    l: { es: "Los agentes llaman a cada sesión por su número (<code>jmux tell 291</code>). Pasa el ratón por una fila del árbol y el número aparece junto al nombre; la sesión que tienes delante lo lleva siempre, y su tarjeta lo dice primero. Escribe «291» en la paleta y saltas a ella. Y cuando un agente te nombra una sesión, dice las dos cosas, «jmux 10 (291)»: un nombre puede reutilizarse, el número nunca.",
+         en: "Agents call each session by its number (<code>jmux tell 291</code>). Hover a row in the tree and the number shows beside its name; the session in front of you always wears it, and its card says it first. Type “291” in the palette and you jump there. And when an agent names a session to you, it says both, “jmux 10 (291)”: a name can be reused, a number never is." },
+    keys: ["⌘ P"], cli: ["jmux ls"],
+    ex: [
+      { t: { es: "Abre la paleta y escribe el número que te dio un agente:", en: "Open the palette and type the number an agent gave you:" }, k: ["⌘ P"] },
+      { t: { es: "La CLI lo dice igual, nombre y número:", en: "The CLI says it the same way, name and number:" }, c: "jmux ls", o: `6: payments-api 2 [57x47] (cwd ${H}/payments-api, pid 73631, claude idle)\n9: payments-api 3 [80x24] (cwd ${H}/payments-api, pid 75462, codex idle*, child of payments-api 2 (6))` },
     ] },
   { id: "session-tree", g: "workspace", kind: "term",
     r: { es: "árbol de sesiones", en: "session tree" },
@@ -254,8 +264,8 @@ you are session 2 "payments-api 1" — project "payments-api", right pane, tab 1
     shot: { src: "shots/palette.webp", alt: { es: "La paleta filtrando «toggle»", en: "The palette filtering “toggle”" }, second: { src: "shots/chords.webp", alt: { es: "Con ⌘ mantenido: cada control muestra su atajo", en: "With ⌘ held: every control shows its chord" } } },
     r: { es: "paleta y atajos", en: "palette and keys" },
     t: { es: "Todo, desde el teclado. Y a tu manera.", en: "Everything from the keyboard. Your way." },
-    l: { es: "La paleta lista todas las acciones. Cualquier atajo se puede reasignar en <code>~/.jmux/config</code>, con condiciones de cuándo aplica. Si mantienes ⌘, ⌃ o ⌥ unos 0,3 s, cada control muestra el atajo que tiene en ese momento, reasignado o no.",
-         en: "The palette lists every action. Any shortcut can be rebound in <code>~/.jmux/config</code>, with conditions for when it applies. Hold ⌘, ⌃ or ⌥ for about 0.3 s and every control shows the chord it answers to right now, rebound or not." },
+    l: { es: "La paleta lista todas las acciones y todas las sesiones, que encuentras por su nombre o por su número. Cualquier atajo se puede reasignar en <code>~/.jmux/config</code>, con condiciones de cuándo aplica. Si mantienes ⌘, ⌃ o ⌥ unos 0,3 s, cada control muestra el atajo que tiene en ese momento, reasignado o no.",
+         en: "The palette lists every action and every session, found by its name or its number. Any shortcut can be rebound in <code>~/.jmux/config</code>, with conditions for when it applies. Hold ⌘, ⌃ or ⌥ for about 0.3 s and every control shows the chord it answers to right now, rebound or not." },
     keys: ["⌘ P", "hold ⌘"], cli: ["~/.jmux/config"],
     ex: [
       { t: { es: "Abre la paleta y escribe lo que quieres hacer:", en: "Open the palette and type what you want:" }, k: ["⌘ P"] },
@@ -264,11 +274,11 @@ you are session 2 "payments-api 1" — project "payments-api", right pane, tab 1
       { t: { es: "Mantén ⌘ y mira: cada control muestra su atajo. Esta página hace lo mismo.", en: "Hold ⌘ and look: every control shows its chord. This page does the same." }, k: ["hold ⌘"] },
     ] },
   { id: "hover", g: "workspace", kind: "claude",
-    shot: { src: "shots/hover.webp", cls: "narrow", alt: { es: "Modelo, esfuerzo, contexto y sus dos hijas Codex", en: "Model, effort, context and its two Codex children" } },
+    shot: { src: "shots/hover.webp", cls: "narrow", alt: { es: "Su número, modelo, esfuerzo, contexto y sus dos hijas Codex", en: "Its number, model, effort, context and its two Codex children" } },
     r: { es: "tarjeta al pasar", en: "hover card" },
     t: { es: "Pasa el ratón y lo sabes todo.", en: "Hover and you know everything." },
-    l: { es: "Si pasas el ratón por el icono de una sesión, una tarjeta te muestra su estado, modelo, esfuerzo y contexto, sus subagentes con tipo y modelo, y quién es su padre y quiénes sus hijas. jmux dibuja sus propios menús y tarjetas en vez de los de macOS.",
-         en: "Hover a session's icon and a card shows its state, model, effort and context, its subagents with type and model, and its parent and children. jmux draws its own menus and cards instead of macOS's." },
+    l: { es: "Si pasas el ratón por el icono de una sesión, una tarjeta te muestra su número, su estado, modelo, esfuerzo y contexto, sus subagentes con tipo y modelo, y quién es su padre y quiénes sus hijas. jmux dibuja sus propios menús y tarjetas en vez de los de macOS.",
+         en: "Hover a session's icon and a card shows its number, its state, model, effort and context, its subagents with type and model, and its parent and children. jmux draws its own menus and cards instead of macOS's." },
     ex: [
       { t: { es: "Pasa el ratón sobre el icono de Claude o Codex de una fila del árbol o de una pestaña.", en: "Hover the Claude or Codex icon on a tree row or a tab." } },
       { t: { es: "Con subagentes en marcha, la tarjeta los lista (hasta seis, luego «+N more»).", en: "With subagents running, the card lists them (up to six, then “+N more”)." } },
@@ -283,7 +293,7 @@ you are session 2 "payments-api 1" — project "payments-api", right pane, tab 1
     cli: ["jmux ls", "jmux wait --until"],
     shot: { src: "shots/tree.webp", cls: "narrow", alt: { es: "Puntos de estado: verde trabajando, morado sin ver", en: "State dots: green working, purple unseen" } },
     ex: [
-      { t: { es: "El estado de todas, en texto (el * es «sin ver»):", en: "Everyone's state, as text (the * means unseen):" }, c: "jmux ls", o: `6: payments-api 2 [57x47] (cwd ${H}/payments-api, pid 73631, claude working)\n7: storefront 1 [80x24] (cwd ${H}/storefront, pid 73637, codex idle*)\n9: payments-api 3 [80x24] (cwd ${H}/payments-api, pid 75462, codex working, child of 6)` },
+      { t: { es: "El estado de todas, en texto (el * es «sin ver»):", en: "Everyone's state, as text (the * means unseen):" }, c: "jmux ls", o: `6: payments-api 2 [57x47] (cwd ${H}/payments-api, pid 73631, claude working)\n7: storefront 1 [80x24] (cwd ${H}/storefront, pid 73637, codex idle*)\n9: payments-api 3 [80x24] (cwd ${H}/payments-api, pid 75462, codex working, child of payments-api 2 (6))` },
       { t: { es: "Espera a que un agente acabe su turno y lee lo que dijo:", en: "Wait for an agent to finish its turn and read what it said:" }, c: "jmux wait 6 --until idle && jmux result 6" },
       { t: { es: "O espera a que te pida algo:", en: "Or wait for it to ask you something:" }, c: "jmux wait 6 --until blocked" },
     ] },
@@ -463,12 +473,12 @@ you are session 2 "payments-api 1" — project "payments-api", right pane, tab 1
     cli: ["jmux search"],
     term: { title: "jmux search idempotency key", body: [
       ["p", "jmux search idempotency key"],
-      ["o", `claude · The retry test in tests/test_refunds.py fails: a refund retried with the same idempotency key… · payments-api · 6m ago · live in session 6 · 5 hits
+      ["o", `claude · The retry test in tests/test_refunds.py fails: a refund retried with the same idempotency key… · payments-api · 6m ago · live in payments-api 2 (6) · 5 hits
   #6 from another session: …add keyword-only \`idempotency_key=None\`, treating identical keyed retries as no-ops…
   #7 assistant: - **Refunds fixed:** in \`payments/refunds.py:23\`, a retry with an idempotency key it has already seen now returns the original amount…
   jmux conversation claude:2328c389-c975-43cf-939f-926b15dae7e0 --range 4:12
 
-codex · Read-only audit — do NOT edit, create or delete any files… · payments-api · 7m ago · live in session 9 · 2 hits
+codex · Read-only audit — do NOT edit, create or delete any files… · payments-api · 7m ago · live in payments-api 3 (9) · 2 hits
   #3 assistant: …add keyword-only \`idempotency_key=None\`, treating identical keyed retries as no-ops and rejecting conflicting reuse…
   jmux conversation codex:01a0ed1a-4db4-79b1-ab96-09d3ec4a9418 --range 0:5`]] },
     ex: [
