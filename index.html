@@ -1,464 +1,861 @@
 <!doctype html>
-<html lang="es" data-theme="dark">
+<html lang="es" data-lang="es" data-theme="paper">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>jmux — el terminal donde tus agentes no se pierden</title>
-<meta name="description" content="jmux: terminal nativo para macOS hecho para Claude Code y Codex. Sesiones que sobreviven a todo, agentes que se ven, se hablan y se reparten el trabajo, y búsqueda en todas tus conversaciones.">
-<meta name="color-scheme" content="dark light">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23141619'/%3E%3Cpath d='M16 20l12 12-12 12' stroke='%2340C786' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Crect x='36' y='20' width='10' height='24' rx='2' fill='%23E6E8EB'/%3E%3C/svg%3E">
+<title>jmux · La mesa tranquila</title>
+<meta name="description" content="Un día entero dirigiendo agentes de Claude Code y Codex desde jmux, un terminal para macOS: lo que haces en la ventana, lo que ves en ella y lo que jmux decide no hacer.">
+<meta property="og:title" content="jmux · The quiet desk">
+<meta property="og:description" content="One full day of running Claude Code and Codex agents from jmux, a terminal for macOS.">
+<meta property="og:type" content="article">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f4eee3">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23f4eee3'/%3E%3Ccircle cx='32' cy='38' r='17' fill='%23c2371a'/%3E%3Crect x='8' y='40' width='48' height='16' fill='%23f4eee3'/%3E%3Crect x='8' y='40' width='48' height='3' fill='%231c1915'/%3E%3C/svg%3E">
+<link rel="preload" href="fonts/Fraunces.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/Newsreader.woff2" as="font" type="font/woff2" crossorigin>
 <script>
-  // Theme and language before first paint: no flash of the wrong one.
+  // Language and theme before the first paint, so neither flashes.
   (function () {
-    var ls = function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } };
-    var t = ls("jmux.site.theme") || "system";
-    var dark = t === "dark" || (t === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
-    document.documentElement.dataset.theme = dark ? "dark" : "light";
-    document.documentElement.dataset.themePref = t;
-    var l = ls("jmux.site.lang") || ((navigator.language || "es").toLowerCase().startsWith("es") ? "es" : "en");
-    document.documentElement.lang = l;
+    var get = function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } };
+    var root = document.documentElement;
+    var q = /[?&]lang=(es|en)\b/.exec(location.search);
+    var lang = (q && q[1]) || get("jmux.site.lang") || ((navigator.language || "es").toLowerCase().indexOf("es") === 0 ? "es" : "en");
+    root.lang = root.dataset.lang = lang;
+    var qt = /[?&]theme=(paper|night|auto)\b/.exec(location.search);
+    // The page before B-295 saved dark, system or light under the same key.
+    var saved = { dark: "night", system: "auto", light: "paper" }[get("jmux.site.theme")] || get("jmux.site.theme");
+    if (saved !== "paper" && saved !== "night") saved = "auto";
+    var pref = (qt && qt[1]) || saved;
+    var night = pref === "night" || (pref === "auto" && matchMedia("(prefers-color-scheme: dark)").matches);
+    root.dataset.theme = night ? "night" : "paper";
+    root.dataset.themePref = pref;
   })();
 </script>
 <style>
-@font-face { font-family: "JetBrains Mono"; src: url("fonts/JetBrainsMono-Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
-@font-face { font-family: "JetBrains Mono"; src: url("fonts/JetBrainsMono-SemiBold.ttf") format("truetype"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Fraunces"; src: url("fonts/Fraunces.woff2") format("woff2"); font-weight: 300 600; font-style: normal; font-display: swap; }
+@font-face { font-family: "Fraunces"; src: url("fonts/Fraunces-Italic.woff2") format("woff2"); font-weight: 300 500; font-style: italic; font-display: swap; }
+@font-face { font-family: "Newsreader"; src: url("fonts/Newsreader.woff2") format("woff2"); font-weight: 400 600; font-style: normal; font-display: swap; }
+@font-face { font-family: "Newsreader"; src: url("fonts/Newsreader-Italic.woff2") format("woff2"); font-weight: 400; font-style: italic; font-display: swap; }
+/* Georgia measured to the two faces, so the swap moves no line. */
+@font-face { font-family: "Text Fallback"; src: local("Georgia"); size-adjust: 92%; ascent-override: 95%; descent-override: 25%; line-gap-override: 0%; }
+@font-face { font-family: "Display Fallback"; src: local("Georgia"); size-adjust: 97%; ascent-override: 96%; descent-override: 25%; line-gap-override: 0%; }
 
-/* jmux's own palette (app/Sources/JmuxApp/Theme.swift), dark and light. */
-:root, [data-theme="dark"] {
-  --bg: #141619; --bg-side: #16171a; --raised: #1a1c1f; --term: #0f1113;
-  --hover: rgba(255,255,255,.045); --active: rgba(255,255,255,.07);
-  --border: rgba(255,255,255,.08); --border-strong: rgba(255,255,255,.14);
-  --text: #e6e8eb; --text-mid: #a2a5a8; --text-dim: #6f7275; --text-faint: #4b4d50;
-  --accent: #40c786; --accent-soft: rgba(64,199,134,.14); --accent-line: rgba(64,199,134,.5);
-  --green: #5bd295; --yellow: #e5c057; --red: #f17070; --blue: #60aaf3; --magenta: #cf8fde; --cyan: #62c8df;
-  --claude: #d97757; --codex: #6b78eb;
-  --glow: rgba(64,199,134,.10);
-  --shadow: 0 30px 80px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.06);
+:root {
+  --paper: #f4eee3; --paper-2: #ece4d5; --paper-3: #e3d9c7;
+  --ink: #1c1915; --ink-2: #5a5247; --ink-3: #6e6658;
+  --rule: #cdc1ab; --rule-soft: #ddd3c1;
+  --red: #c2371a; --red-wash: rgba(194, 55, 26, .08);
+  --plate: 0 1px 2px rgba(28, 25, 21, .08), 0 24px 48px -28px rgba(28, 25, 21, .45);
+  --display: "Fraunces", "Display Fallback", Georgia, serif;
+  --text: "Newsreader", "Text Fallback", Georgia, serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --measure: 35rem; --margin: 15rem; --gutter: 2.75rem;
+  color-scheme: light;
 }
-[data-theme="light"] {
-  --bg: #ffffff; --bg-side: #fbfbfc; --raised: #ffffff; --term: #f7f8f9;
-  --hover: rgba(0,0,0,.04); --active: rgba(0,0,0,.06);
-  --border: rgba(0,0,0,.10); --border-strong: rgba(0,0,0,.16);
-  --text: #27292d; --text-mid: #53555a; --text-dim: #777a7f; --text-faint: #96989c;
-  --accent: #4ba3f7; --accent-soft: rgba(75,163,247,.14); --accent-line: rgba(75,163,247,.5);
-  --green: #009259; --yellow: #b37903; --red: #c8393a; --blue: #1f74bf; --magenta: #9750a7; --cyan: #1e7ca1;
-  --glow: rgba(75,163,247,.10);
-  --shadow: 0 30px 70px rgba(20,30,50,.18), 0 0 0 1px rgba(0,0,0,.08);
+[data-theme="night"] {
+  --paper: #10141c; --paper-2: #151a24; --paper-3: #1c2230;
+  --ink: #ece5d6; --ink-2: #a39b8b; --ink-3: #8c8574;
+  --rule: #2e3546; --rule-soft: #232a38;
+  --red: #f2683f; --red-wash: rgba(242, 104, 63, .1);
+  --plate: 0 1px 2px rgba(0, 0, 0, .4), 0 26px 56px -26px rgba(0, 0, 0, .9);
+  color-scheme: dark;
 }
+html[data-lang="es"] [data-l="en"], html[data-lang="en"] [data-l="es"],
+[data-theme="paper"] .for-night, [data-theme="night"] .for-paper { display: none !important; }
+
 * { box-sizing: border-box; }
-html { scroll-padding-top: 76px; -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; scroll-padding-top: 4rem; }
 body {
-  margin: 0; background: var(--bg); color: var(--text);
-  font: 16px/1.6 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", system-ui, sans-serif;
-  -webkit-font-smoothing: antialiased;
+  margin: 0; background: var(--paper); color: var(--ink);
+  font: 400 1.1875rem/1.6 var(--text); font-kerning: normal;
+  font-variant-numeric: oldstyle-nums proportional-nums;
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
 }
-.mono, code, kbd, pre, .kicker { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
-a { color: inherit; }
-::selection { background: var(--accent-soft); }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+a { color: inherit; text-decoration-color: var(--red); text-decoration-thickness: 1px; text-underline-offset: .18em; }
+a:hover { color: var(--red); }
+::selection { background: var(--red); color: var(--paper); }
+:focus-visible { outline: 2px solid var(--red); outline-offset: 3px; }
+kbd, code { font-family: var(--mono); font-size: .8em; font-variant-numeric: normal; }
+kbd { padding: .05em .35em; border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 4px; background: var(--paper-2); white-space: nowrap; }
+code { background: var(--paper-2); padding: .08em .3em; border-radius: 3px; }
+.ui { font-variant-caps: normal; font-weight: 600; letter-spacing: .005em; }
+.ui::before, .ui::after { content: none; }
+.skip { position: absolute; left: -999px; }
+.skip:focus { left: 1rem; top: 1rem; z-index: 10; background: var(--paper); padding: .5rem 1rem; }
 
-/* ── top bar ─────────────────────────────────────────────── */
-.top {
-  position: sticky; top: 0; z-index: 50; height: 56px;
-  display: flex; align-items: center; gap: 18px; padding: 0 22px;
-  background: color-mix(in srgb, var(--bg) 82%, transparent);
-  backdrop-filter: saturate(160%) blur(14px); -webkit-backdrop-filter: saturate(160%) blur(14px);
-  border-bottom: 1px solid var(--border);
+/* ── the folio: the masthead line every page of a magazine carries ── */
+.folio {
+  display: flex; align-items: baseline; gap: 1.25rem; flex-wrap: wrap;
+  max-width: 76rem; margin: 0 auto; padding: 1.1rem 1.5rem .9rem;
+  border-bottom: 1px solid var(--ink); font-size: .95rem;
 }
-.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 600; letter-spacing: .02em; }
-.brand svg { width: 26px; height: 26px; }
-.brand .sub { color: var(--text-dim); font-weight: 400; font-size: 12px; }
-.top nav { display: flex; gap: 4px; margin-left: 8px; }
-.top nav a { text-decoration: none; color: var(--text-mid); font-size: 14px; padding: 6px 10px; border-radius: 8px; }
-.top nav a:hover { background: var(--hover); color: var(--text); }
-.top .spacer { flex: 1; }
-.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 9px; padding: 2px; gap: 2px; }
-.seg button { all: unset; cursor: pointer; font: 12px/1 "JetBrains Mono", monospace; color: var(--text-dim); padding: 6px 8px; border-radius: 6px; }
-.seg button[aria-pressed="true"] { background: var(--active); color: var(--text); }
-.seg button:hover { color: var(--text); }
-.btn {
-  display: inline-flex; align-items: center; gap: 8px; text-decoration: none; cursor: pointer;
-  font: 600 14px/1 -apple-system, system-ui, sans-serif; padding: 10px 14px; border-radius: 10px;
-  border: 1px solid var(--border-strong); background: var(--raised); color: var(--text);
+.mark { font: 600 1.6rem/1 var(--display); letter-spacing: -.02em; text-decoration: none; }
+.mark i { color: var(--red); font-style: normal; }
+.folio .issue { color: var(--ink-2); font-style: italic; }
+.folio .tools { margin-left: auto; display: flex; gap: 1.1rem; }
+.switch { display: inline-flex; gap: .15rem; align-items: baseline; }
+.switch button {
+  all: unset; cursor: pointer; padding: .1rem .3rem; color: var(--ink-3);
+  font: inherit; font-size: .9rem; letter-spacing: .04em; text-transform: uppercase;
 }
-.btn:hover { border-color: var(--accent-line); }
-.btn.primary { background: var(--accent); color: #07140d; border-color: transparent; }
-[data-theme="light"] .btn.primary { color: #fff; }
-.btn.primary:hover { filter: brightness(1.07); }
-.btn.lg { padding: 13px 18px; font-size: 15px; border-radius: 12px; }
+.switch button[aria-pressed="true"] { color: var(--ink); box-shadow: inset 0 -2px var(--red); }
+.switch button:hover { color: var(--ink); }
+.switch button:focus-visible { outline: 2px solid var(--red); }
+.switch .sep { color: var(--rule); }
 
-/* ── hero ────────────────────────────────────────────────── */
-.hero { position: relative; overflow: hidden; padding: 72px 22px 40px; }
-.hero::before {
-  content: ""; position: absolute; inset: 0; pointer-events: none;
-  background:
-    radial-gradient(900px 420px at 18% -10%, var(--glow), transparent 70%),
-    linear-gradient(var(--border) 1px, transparent 1px) 0 0 / 44px 44px,
-    linear-gradient(90deg, var(--border) 1px, transparent 1px) 0 0 / 44px 44px;
-  mask-image: linear-gradient(to bottom, #000 0%, transparent 78%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 78%);
-  opacity: .55;
+/* ── the running head: where in the day the reader is ── */
+.runhead {
+  position: fixed; inset: 0 0 auto 0; z-index: 20; height: 2.75rem;
+  display: flex; align-items: center; gap: 1rem; padding: 0 1.5rem;
+  background: color-mix(in srgb, var(--paper) 92%, transparent);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--rule-soft); font-size: .95rem;
+  transform: translateY(-101%); transition: transform .35s ease;
 }
-.wrap { max-width: 1240px; margin: 0 auto; position: relative; }
-.hero-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: start; }
-.eyebrow { font: 13px/1 "JetBrains Mono", monospace; color: var(--accent); display: inline-flex; align-items: center; gap: 8px; }
-.eyebrow .cursor { width: 8px; height: 15px; background: var(--accent); display: inline-block; animation: blink 1.1s steps(1) infinite; }
-@keyframes blink { 50% { opacity: 0; } }
-h1 { font-size: clamp(42px, 6.4vw, 86px); line-height: 1.0; letter-spacing: -.04em; margin: 18px 0 26px; font-weight: 700; max-width: 14.5em; text-wrap: balance; }
-h1 em { font-style: normal; color: var(--accent); }
-.hero .lede { font-size: 19px; color: var(--text-mid); max-width: 38em; margin: 0; }
-.hero-side { display: flex; flex-direction: column; gap: 14px; }
-.install {
-  display: flex; align-items: center; gap: 10px; padding: 12px 12px 12px 16px;
-  background: var(--term); border: 1px solid var(--border-strong); border-radius: 12px; font-size: 13.5px;
+.runhead.on { transform: none; }
+.runhead .mark { font-size: 1.15rem; }
+.runhead .now { font: italic 400 1.05rem/1 var(--display); color: var(--red); font-variant-numeric: lining-nums tabular-nums; }
+.runhead .what { color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.runhead .day { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--red); transform-origin: 0 50%; transform: scaleX(var(--day, 0)); transition: transform .6s ease; }
+
+/* ── the cover ── */
+.cover { max-width: 76rem; margin: 0 auto; padding: 0 1.5rem; }
+.sky { position: relative; overflow: hidden; padding: clamp(2.5rem, 7vw, 6rem) 0 clamp(1.25rem, 3vw, 2.25rem); }
+.cover .over { position: relative; z-index: 1; margin: 0 0 1.5rem; font-size: 1rem; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+.cover h1 {
+  position: relative; z-index: 1; margin: 0; max-width: 9.6ch;
+  font: 300 clamp(3.5rem, 11.5vw, 9rem)/.92 var(--display); letter-spacing: -.035em;
+  font-variation-settings: "opsz" 144;
 }
-.install code { flex: 1; overflow-x: auto; white-space: nowrap; color: var(--text); }
-.install code::before { content: "$ "; color: var(--accent); }
-.hero-ctas { display: flex; gap: 10px; flex-wrap: wrap; }
-.meta-line { font: 12px/1.5 "JetBrains Mono", monospace; color: var(--text-dim); }
-.meta-line b { color: var(--text-mid); font-weight: 400; }
-
-.shot-hero { margin: 48px auto 0; position: relative; max-width: 1240px; }
-.window { position: relative; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); background: var(--term); }
-.window img { display: block; width: 100%; height: auto; }
-.pin { text-decoration: none;
-  position: absolute; transform: translate(-50%, -50%); z-index: 2;
-  width: 26px; height: 26px; border-radius: 50%; border: 0; cursor: pointer;
-  background: var(--accent); color: #07140d; font: 600 12px/26px "JetBrains Mono", monospace; text-align: center;
-  box-shadow: 0 0 0 5px var(--accent-soft), 0 6px 18px rgba(0,0,0,.4);
-  animation: pulse 2.4s ease-in-out infinite;
+.cover h1 em { font-style: italic; color: var(--red); font-weight: 300; }
+/* The sun stands on the horizon, half risen; at night it is the moon. */
+.sun {
+  position: absolute; z-index: 2; right: clamp(-2rem, 3vw, 4rem); bottom: 0;
+  width: clamp(8rem, 30vw, 25rem); aspect-ratio: 1; border-radius: 50%;
+  background: var(--red); transform: translateY(46%); mix-blend-mode: multiply; pointer-events: none;
+  animation: rise 2.4s cubic-bezier(.2, .7, .2, 1) both;
 }
-[data-theme="light"] .pin { color: #fff; }
-@keyframes pulse { 0%,100% { box-shadow: 0 0 0 5px var(--accent-soft), 0 6px 18px rgba(0,0,0,.4); } 50% { box-shadow: 0 0 0 10px transparent, 0 6px 18px rgba(0,0,0,.4); } }
-.pin .tip {
-  position: absolute; left: 50%; top: 34px; transform: translateX(-50%); width: max-content; max-width: 260px;
-  background: var(--raised); color: var(--text); border: 1px solid var(--border-strong); border-radius: 10px;
-  padding: 10px 12px; font: 13px/1.45 -apple-system, system-ui, sans-serif; text-align: left;
-  box-shadow: 0 12px 40px rgba(0,0,0,.35); opacity: 0; pointer-events: none; transition: opacity .15s, transform .15s;
+[data-theme="night"] .sun { z-index: 0; mix-blend-mode: normal; background: radial-gradient(circle at 30% 36%, transparent 0 47%, #e6dcc6 47.6%); transform: translateY(40%) rotate(-12deg); animation: none; }
+@keyframes rise { from { transform: translateY(78%); } }
+.horizon { height: 0; border-top: 2px solid var(--ink); }
+.cover .lower { display: grid; gap: 2rem 3rem; grid-template-columns: minmax(0, 1fr); padding: 2rem 0 3rem; }
+@media (min-width: 860px) { .cover .lower { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); } }
+.dek { margin: 0; font: 400 clamp(1.35rem, 2.4vw, 1.75rem)/1.4 var(--text); }
+.credit { margin: 1.25rem 0 0; color: var(--ink-2); font-style: italic; font-size: 1rem; }
+
+.contents h2 { margin: 0 0 .6rem; font: 600 .8rem/1 var(--text); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); }
+.contents ol { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
+.contents li { border-bottom: 1px solid var(--rule-soft); }
+.contents a { display: grid; grid-template-columns: 3.6rem 1fr; gap: .75rem; padding: .42rem 0; text-decoration: none; }
+.contents a:hover .t { color: var(--red); }
+.contents .h { font: italic 400 1.05rem/1.45 var(--display); color: var(--red); font-variant-numeric: lining-nums tabular-nums; }
+.contents .t { line-height: 1.45; }
+
+/* ── a chapter ── */
+main { counter-reset: fig; }
+.ch { max-width: 76rem; margin: 0 auto; padding: clamp(3.5rem, 8vw, 7rem) 1.5rem 0; }
+.ch-head { max-width: calc(var(--measure) + var(--gutter) + var(--margin)); margin: 0 auto 2.25rem; }
+.ch-head .time {
+  display: block; margin: 0 0 .25rem; color: var(--red);
+  font: italic 300 clamp(3.4rem, 9vw, 6.5rem)/1 var(--display); letter-spacing: -.02em;
+  font-variant-numeric: lining-nums; font-variation-settings: "opsz" 144;
 }
-.pin .tip b { display: block; font-weight: 600; margin-bottom: 2px; }
-.pin .tip span { color: var(--accent); font-family: "JetBrains Mono", monospace; font-size: 12px; }
-.pin:hover .tip, .pin:focus-visible .tip { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(2px); }
-.pin.flip .tip { top: auto; bottom: 34px; }
-.pin.left .tip { left: 0; transform: none; }
-.pin.right .tip { left: auto; right: 0; transform: none; }
-.hero-caption { text-align: center; color: var(--text-dim); font-size: 13px; margin-top: 14px; }
+.ch-head h2 { margin: 0; font: 400 clamp(2.1rem, 5vw, 3.6rem)/1.04 var(--display); letter-spacing: -.02em; max-width: 18ch; font-variation-settings: "opsz" 96; }
+.ch-head .stand { margin: 1rem 0 0; max-width: 34rem; font-size: 1.32rem; line-height: 1.45; font-style: italic; color: var(--ink-2); }
+.ch-head { border-top: 1px solid var(--ink); padding-top: 1.25rem; }
 
-.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; margin: 44px 0 0; }
-.stat { background: var(--bg); padding: 20px 22px; }
-.stat .n { font: 600 30px/1.1 "JetBrains Mono", monospace; letter-spacing: -.02em; }
-.stat .n small { font-size: 16px; color: var(--text-mid); font-weight: 400; }
-.stat .d { color: var(--text-mid); font-size: 14px; margin-top: 6px; }
-.stat .s { color: var(--text-faint); font: 11px/1.4 "JetBrains Mono", monospace; margin-top: 8px; }
-
-/* ── paths (pick what you came for) ──────────────────────── */
-.paths { padding: 56px 22px 8px; }
-.paths h2 { font-size: 15px; font-weight: 500; color: var(--text-dim); margin: 0 0 14px; font-family: "JetBrains Mono", monospace; }
-.path-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-.path {
-  all: unset; cursor: pointer; display: block; padding: 16px 18px; border-radius: 14px;
-  border: 1px solid var(--border); background: var(--raised); transition: border-color .15s, transform .15s;
+.col { max-width: var(--measure); margin: 0 auto; }
+.col > p { margin: 0 0 1.05em; hyphens: auto; -webkit-hyphens: auto; }
+.col > p.lead::first-letter {
+  float: left; margin: .06em .09em 0 0; color: var(--red);
+  font: 400 4.6em/.8 var(--display); font-variation-settings: "opsz" 144;
 }
-.path:hover { border-color: var(--accent-line); transform: translateY(-2px); }
-.path[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
-.path b { display: block; font-size: 15px; margin-bottom: 4px; }
-.path span { color: var(--text-mid); font-size: 13.5px; line-height: 1.45; display: block; }
-.path i { font-style: normal; font: 11px/1 "JetBrains Mono", monospace; color: var(--accent); display: block; margin-bottom: 10px; }
+.col > p.open > .sc:first-child { letter-spacing: .06em; text-transform: uppercase; font-size: .84em; font-weight: 600; }
 
-/* ── the tour: rail + features ───────────────────────────── */
-.tour { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 44px; padding: 30px 22px 80px; max-width: 1284px; margin: 0 auto; }
-.rail {
-  position: sticky; top: 72px; align-self: start; max-height: calc(100vh - 88px);
-  display: flex; flex-direction: column; background: var(--bg-side); border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
+/* margin notes, the how-to box and the "won't" thread */
+.note, .how, .wont { font-size: .97rem; line-height: 1.5; margin: 0 0 1.4rem; }
+.note { color: var(--ink-2); }
+.note::before { content: "※"; color: var(--red); margin-right: .35em; font-style: normal; }
+.how { border-top: 2px solid var(--ink); padding-top: .6rem; }
+.how h3, .wont h3 { margin: 0 0 .5rem; font: 600 .78rem/1.2 var(--text); letter-spacing: .12em; text-transform: uppercase; }
+.how ol { margin: 0; padding: 0 0 0 1.1rem; }
+.how li { margin: .25rem 0; }
+.how li::marker { color: var(--red); font-family: var(--display); font-style: italic; }
+.wont { border-left: 2px solid var(--red); padding-left: .9rem; }
+.wont h3 { color: var(--red); }
+.wont p { margin: 0; }
+@media (min-width: 1120px) {
+  .col { margin-left: calc(50% - (var(--measure) + var(--gutter) + var(--margin)) / 2); }
+  .note, .how, .wont { float: right; clear: right; width: var(--margin); margin-right: calc(-1 * (var(--margin) + var(--gutter))); margin-top: .3rem; }
 }
-.rail-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); font: 11px/1 "JetBrains Mono", monospace; letter-spacing: .12em; color: var(--text-dim); }
-.rail-head .count { margin-left: auto; letter-spacing: 0; color: var(--text-faint); }
-.filter { position: relative; padding: 10px 10px 6px; }
-.filter input {
-  width: 100%; font: 13px/1 "JetBrains Mono", monospace; color: var(--text); background: var(--bg); border: 1px solid var(--border-strong);
-  border-radius: 9px; padding: 9px 30px 9px 30px; outline: none;
+@media (max-width: 1119px) {
+  .ch-head { max-width: var(--measure); }
+  .note, .how, .wont { margin: 1.4rem 0; }
+  .how { background: var(--paper-2); border-top-width: 2px; padding: .8rem 1rem .9rem; }
 }
-.filter input:focus { border-color: var(--accent-line); box-shadow: 0 0 0 3px var(--accent-soft); }
-.filter svg { position: absolute; left: 20px; top: 20px; width: 13px; height: 13px; color: var(--text-dim); }
-.filter kbd { position: absolute; right: 18px; top: 17px; }
-.tree { overflow-y: auto; padding: 4px 6px 8px; flex: 1; scrollbar-width: thin; }
-.tree .proj { display: flex; align-items: center; gap: 8px; padding: 7px 8px 5px; font: 600 12.5px/1.2 "JetBrains Mono", monospace; color: var(--text); cursor: pointer; border-radius: 7px; text-decoration: none; }
-.tree .proj:hover { background: var(--hover); }
-.tree .proj svg { width: 14px; height: 14px; color: var(--text-dim); flex: none; }
-.tree a.row { display: flex; align-items: center; gap: 8px; padding: 5px 8px 5px 22px; border-radius: 7px; text-decoration: none; color: var(--text-mid); font: 12.5px/1.25 "JetBrains Mono", monospace; position: relative; }
-.tree a.row:hover { background: var(--hover); color: var(--text); }
-.tree a.row.current { background: var(--active); color: var(--text); }
-.tree a.row.current::before { content: ""; position: absolute; left: 4px; top: 5px; bottom: 5px; width: 2px; border-radius: 2px; background: var(--accent); }
-.tree a.row svg { width: 13px; height: 13px; flex: none; }
-.tree a.row .label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: transparent; }
-.dot.unseen { background: var(--magenta); }
-.dot.working { background: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 25%, transparent); animation: breathe 1.6s ease-in-out infinite; }
-.dot.open { background: var(--yellow); }
-.dot.new { background: var(--accent); border-radius: 2px; transform: rotate(45deg); }
-@keyframes breathe { 50% { opacity: .45; } }
-.k-claude { color: var(--claude); } .k-codex { color: var(--codex); } .k-term, .k-doc, .k-mac, .k-search { color: var(--text-dim); }
-.rail-foot { border-top: 1px solid var(--border); padding: 6px 8px 8px; }
-.counter { all: unset; box-sizing: border-box; cursor: pointer; width: 100%; display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 6px; font: 12px/1.3 "JetBrains Mono", monospace; color: var(--text-dim); }
-.counter:hover { background: var(--hover); color: var(--text); }
-.counter[aria-pressed="true"] { background: var(--active); color: var(--text); }
-.counter .n { margin-left: auto; }
-.rail-hint { font: 11px/1.4 "JetBrains Mono", monospace; color: var(--text-faint); padding: 6px 6px 0; }
-.empty { display: none; padding: 40px 0; color: var(--text-dim); }
 
-.group-head { padding: 26px 0 6px; margin-top: 30px; border-top: 1px solid var(--border); }
-.group-head:first-child { margin-top: 0; border-top: 0; padding-top: 0; }
-.group-head .kicker { color: var(--accent); font-size: 12.5px; margin: 0; }
-.group-head h2 { font-size: clamp(30px, 3.6vw, 44px); letter-spacing: -.03em; line-height: 1.08; margin: 10px 0 8px; }
-.group-head p { color: var(--text-mid); font-size: 17px; max-width: 44em; margin: 0; }
-
-.feat { padding: 38px 0 6px; scroll-margin-top: 76px; }
-.feat + .feat { border-top: 1px dashed var(--border); }
-.feat-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: start; }
-.feat .kicker { font-size: 12px; color: var(--text-dim); margin: 0 0 8px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.badge { font: 11px/1 "JetBrains Mono", monospace; padding: 4px 7px; border-radius: 99px; border: 1px solid var(--accent-line); color: var(--accent); background: var(--accent-soft); }
-.badge.warn { border-color: color-mix(in srgb, var(--yellow) 50%, transparent); color: var(--yellow); background: color-mix(in srgb, var(--yellow) 12%, transparent); }
-.feat h3 { font-size: clamp(23px, 2.3vw, 30px); letter-spacing: -.022em; line-height: 1.15; margin: 0 0 10px; }
-.feat .lede { color: var(--text-mid); font-size: 16.5px; max-width: 46em; margin: 0; }
-.feat .lede b { color: var(--text); font-weight: 600; }
-.anchor { all: unset; cursor: pointer; font: 12px/1 "JetBrains Mono", monospace; color: var(--text-faint); padding: 6px 8px; border-radius: 7px; border: 1px solid transparent; white-space: nowrap; }
-.anchor:hover { color: var(--text); border-color: var(--border); }
-.how { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 0; padding: 0; list-style: none; }
-.how li { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--text-mid); background: var(--raised); border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; }
-.how li code { color: var(--text); font-size: 12.5px; }
-kbd {
-  display: inline-block; min-width: 20px; text-align: center; font-size: 12px; line-height: 18px; padding: 0 5px; color: var(--text);
-  background: var(--bg); border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 5px;
+/* figures: numbered plates with their caption set as a note */
+.fig { counter-increment: fig; margin: 2.4rem 0 2.6rem; clear: both; }
+[data-theme="night"] .fig img { outline: 1px solid var(--rule); outline-offset: -1px; }
+.fig img { display: block; width: 100%; height: auto; border-radius: 6px; box-shadow: var(--plate); background: var(--paper-3); }
+.fig figcaption { margin-top: .85rem; font-size: .95rem; line-height: 1.5; color: var(--ink-2); max-width: 40rem; }
+.fig figcaption::before { content: "Fig. " counter(fig); margin-right: .55rem; color: var(--red); font: italic 400 1.02rem/1 var(--display); font-variant-numeric: lining-nums; }
+@media (min-width: 1120px) {
+  .fig.wide { width: calc(var(--measure) + var(--gutter) + var(--margin)); max-width: none; }
+  .fig.wide figcaption { max-width: var(--measure); }
 }
-.how li .plus { color: var(--text-faint); font-size: 11px; }
-
-figure { margin: 22px 0 0; }
-.frame { border-radius: 12px; overflow: hidden; border: 1px solid var(--border-strong); background: var(--term); cursor: zoom-in; position: relative; }
-.frame img { display: block; width: 100%; height: auto; }
-.frame.narrow { max-width: 420px; }
-.frame.mid { max-width: 680px; }
-.frame.strip { max-width: 560px; }
-.frame.tband { position: relative; }
-.ring { position: absolute; top: 50%; height: 80%; aspect-ratio: 1; transform: translate(-50%, -50%); border: 2px solid var(--accent); border-radius: 12px; box-shadow: 0 0 0 4px var(--accent-soft); animation: pulse 2.4s ease-in-out infinite; pointer-events: none; }
-figcaption { color: var(--text-dim); font-size: 13px; margin-top: 8px; }
-.duo { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
-
-.term { background: var(--term); border: 1px solid var(--border-strong); border-radius: 12px; overflow: hidden; margin: 22px 0 0; }
-.term-bar { display: flex; align-items: center; gap: 7px; padding: 9px 12px; border-bottom: 1px solid var(--border); font: 11.5px/1 "JetBrains Mono", monospace; color: var(--text-dim); }
-.term-bar i { width: 10px; height: 10px; border-radius: 50%; background: var(--border-strong); display: inline-block; }
-.term-bar span { margin-left: 8px; }
-.term pre { margin: 0; padding: 14px 16px; font-size: 12.8px; line-height: 1.55; overflow-x: auto; color: var(--text); }
-.term .p { color: var(--accent); user-select: none; }
-.term .o { color: var(--text-mid); }
-.term .h { color: var(--green); }
-.term .y { color: var(--yellow); }
-.term .m { color: var(--magenta); }
-.term .c { color: var(--claude); }
-.term .x { color: var(--codex); }
-.term .d { color: var(--text-dim); }
-
-/* the expandable example */
-details.ex { margin: 20px 0 0; border: 1px solid var(--border); border-radius: 12px; background: var(--raised); overflow: hidden; }
-details.ex[open] { border-color: var(--accent-line); }
-details.ex summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 12px 16px; font-weight: 600; font-size: 14.5px; }
-details.ex summary::-webkit-details-marker { display: none; }
-details.ex summary .chev { width: 16px; height: 16px; color: var(--accent); transition: transform .18s; flex: none; }
-details.ex[open] summary .chev { transform: rotate(90deg); }
-details.ex summary .n { margin-left: auto; font: 12px/1 "JetBrains Mono", monospace; color: var(--text-dim); font-weight: 400; }
-details.ex summary:hover { background: var(--hover); }
-.steps { list-style: none; counter-reset: s; margin: 0; padding: 4px 16px 16px; }
-.steps > li { counter-increment: s; position: relative; padding: 12px 0 4px 40px; }
-.steps > li::before {
-  content: counter(s); position: absolute; left: 0; top: 11px; width: 24px; height: 24px; border-radius: 50%;
-  font: 600 12px/24px "JetBrains Mono", monospace; text-align: center; color: var(--accent); background: var(--accent-soft);
+.plate { position: relative; }
+.zoom { display: block; cursor: zoom-in; }
+/* A capture cut in two, around what the page must not show: two plates, one figure. */
+.fig .zoom + .zoom, .fig .plate + .plate { margin-top: .75rem; }
+/* A plate cut from the right part of the window, at the scale of the whole window above it. */
+.plate.right { width: 82.31%; margin-left: auto; }
+.pin, .k {
+  display: inline-grid; place-items: center; width: 1.45rem; height: 1.45rem; border-radius: 50%;
+  background: var(--red); color: #fff8ef; font: italic 500 .85rem/1 var(--display); font-variant-numeric: lining-nums;
 }
-.steps > li + li { border-top: 1px dashed var(--border); }
-.steps p { margin: 0 0 8px; font-size: 15px; }
-.steps p code { font-size: 13px; background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 1px 5px; }
-.cmd { display: flex; align-items: flex-start; gap: 8px; background: var(--term); border: 1px solid var(--border); border-radius: 9px; padding: 9px 9px 9px 12px; margin: 6px 0 0; }
-.cmd pre { flex: 1; margin: 0; font-size: 12.8px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
-.cmd pre::before { content: "$ "; color: var(--accent); user-select: none; }
-.cmd.plain pre::before { content: ""; }
-.out { margin: 6px 0 0; padding: 10px 12px; border-left: 2px solid var(--border-strong); font-size: 12.3px; line-height: 1.5; color: var(--text-mid); white-space: pre-wrap; word-break: break-word; background: color-mix(in srgb, var(--term) 60%, transparent); border-radius: 0 8px 8px 0; max-height: 360px; overflow: auto; }
-.copy { all: unset; cursor: pointer; flex: none; font: 11px/1 "JetBrains Mono", monospace; color: var(--text-dim); padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); }
-.copy:hover { color: var(--text); border-color: var(--border-strong); }
-.copy.ok { color: var(--accent); border-color: var(--accent-line); }
-.steps .keys { display: inline-flex; gap: 4px; flex-wrap: wrap; align-items: center; }
-
-/* honest section, install, footer */
-.band { padding: 70px 22px; border-top: 1px solid var(--border); }
-.band h2 { font-size: clamp(30px, 3.6vw, 44px); letter-spacing: -.03em; margin: 8px 0 10px; line-height: 1.08; }
-.band .kicker { color: var(--accent); font-size: 12.5px; margin: 0; }
-.band .lede { color: var(--text-mid); font-size: 17px; max-width: 46em; margin: 0 0 28px; }
-.cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-.card { background: var(--raised); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; }
-.card h4 { margin: 0 0 8px; font-size: 16px; }
-.card p, .card li { color: var(--text-mid); font-size: 14.5px; margin: 0; }
-.card ul { margin: 0; padding-left: 18px; }
-.card li + li { margin-top: 6px; }
-.card .tag { font: 11px/1 "JetBrains Mono", monospace; color: var(--text-dim); display: block; margin-bottom: 10px; }
-.install-steps { max-width: 820px; }
-.foot { border-top: 1px solid var(--border); padding: 30px 22px 50px; color: var(--text-dim); font-size: 13px; }
-.foot .wrap { display: flex; gap: 20px; flex-wrap: wrap; align-items: center; }
-.foot a { color: var(--text-mid); }
-
-/* lightbox, chord labels, toast */
-.lightbox { position: fixed; inset: 0; z-index: 100; background: rgba(5,7,9,.86); display: none; align-items: center; justify-content: center; padding: 30px; cursor: zoom-out; backdrop-filter: blur(4px); }
-.lightbox.on { display: flex; }
-.lightbox img { max-width: 100%; max-height: 100%; border-radius: 10px; box-shadow: 0 30px 100px rgba(0,0,0,.6); }
-.lightbox p { position: absolute; bottom: 12px; left: 0; right: 0; text-align: center; color: #a2a5a8; font-size: 13px; margin: 0; }
-.chord {
-  position: absolute; z-index: 60; transform: translate(-50%, -115%); pointer-events: none;
-  font: 600 11px/1 "JetBrains Mono", monospace; color: #07140d; background: var(--accent); padding: 4px 6px; border-radius: 6px;
-  box-shadow: 0 4px 14px rgba(0,0,0,.35);
+.pin { position: absolute; left: var(--x); top: var(--y); transform: translate(-50%, -50%); box-shadow: 0 0 0 2px var(--paper), 0 4px 10px rgba(0, 0, 0, .35); }
+@media (max-width: 700px) { .pin { width: 1.05rem; height: 1.05rem; font-size: .64rem; box-shadow: 0 0 0 1.5px var(--paper); } }
+@media (max-width: 560px) { .pin { width: .82rem; height: .82rem; font-size: .52rem; box-shadow: 0 0 0 1px var(--paper); } }
+.k { width: 1.2rem; height: 1.2rem; font-size: .74rem; margin: 0 .2rem 0 .1rem; vertical-align: .08em; }
+@media (min-width: 1120px) {
+  .fig.bleed { --block: calc(var(--measure) + var(--gutter) + var(--margin)); --w: min(72rem, 100vw - 3rem); width: var(--w); margin-left: calc((var(--block) - var(--w)) / 2); }
+  .fig.bleed figcaption { margin-left: calc((var(--w) - var(--block)) / 2); max-width: var(--measure); }
+  .fig.side { float: right; clear: right; width: var(--margin); margin: .3rem calc(-1 * (var(--margin) + var(--gutter))) 1.4rem 0; }
 }
-[data-theme="light"] .chord { color: #fff; }
-.toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(20px); opacity: 0; z-index: 120; background: var(--raised); border: 1px solid var(--border-strong); border-radius: 10px; padding: 9px 14px; font: 12.5px/1.2 "JetBrains Mono", monospace; transition: .18s; box-shadow: 0 10px 30px rgba(0,0,0,.3); }
-.toast.on { opacity: 1; transform: translateX(-50%); }
-.keys-help { position: fixed; inset: 0; z-index: 110; display: none; align-items: center; justify-content: center; background: rgba(5,7,9,.6); }
-.keys-help.on { display: flex; }
-.keys-help .card { width: min(440px, 92vw); }
-.keys-help table { width: 100%; border-collapse: collapse; font-size: 14px; }
-.keys-help td { padding: 7px 0; border-bottom: 1px solid var(--border); color: var(--text-mid); }
-.keys-help td:first-child { width: 90px; }
+.fig.side img { max-width: 16rem; }
+.fig.phones .row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(.6rem, 2vw, 1.5rem); align-items: start; }
+.fig.phones img { border-radius: 18px; }
+.fig.phones.two .row { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 30rem; }
+@media (min-width: 1120px) { .fig.phones.wide { width: calc(var(--measure) + var(--gutter) + var(--margin)); } .fig.phones.wide .row { max-width: 46rem; } }
+@media (max-width: 560px) { .fig.phones .row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
-.hidden { display: none !important; }
-.seg button:focus-visible, .path:focus-visible, .counter:focus-visible, .anchor:focus-visible, .copy:focus-visible, .pin:focus-visible, .frame:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.hero-grid > *, .tour > *, .hero-side, .install { min-width: 0; }
-html, body { overflow-x: clip; }
+.pull { margin: 2.6rem 0; padding: 0; font: italic 300 clamp(1.7rem, 3.4vw, 2.4rem)/1.2 var(--display); letter-spacing: -.01em; color: var(--ink); }
+.pull::before { content: "“"; color: var(--red); margin-right: .05em; }
+.pull::after { content: "”"; color: var(--red); }
+[data-lang="es"] .pull::before { content: "«"; } [data-lang="es"] .pull::after { content: "»"; }
 
-@media (max-width: 1080px) {
-  .hero-grid { grid-template-columns: 1fr; gap: 26px; }
-  .tour { grid-template-columns: 1fr; }
-  .rail { position: relative; top: 0; max-height: 420px; }
-  .path-grid, .stats { grid-template-columns: repeat(2, 1fr); }
-  .cols { grid-template-columns: 1fr; }
-  .top nav { display: none; }
+/* a typeset figure: the six rules as their cards read */
+.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 2px solid var(--ink); border-bottom: 1px solid var(--rule); }
+.cards .band { padding: .75rem .9rem 1rem; border-right: 1px solid var(--rule-soft); }
+.cards .band:last-child { border-right: 0; }
+.cards h4 { margin: 0 0 .7rem; font: 600 .72rem/1.2 var(--text); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); }
+.cards dl { margin: 0; }
+.cards dt { font: 500 1.15rem/1.2 var(--display); }
+.cards dt .shield { color: var(--red); font-size: .85em; margin-left: .3rem; }
+.cards .bandnote { margin: .2rem 0 0; font-size: .85rem; font-style: italic; color: var(--ink-3); }
+.cards dd { margin: .15rem 0 .9rem; font-size: .93rem; line-height: 1.4; color: var(--ink-2); }
+@media (max-width: 720px) { .cards { grid-template-columns: 1fr; } .cards .band { border-right: 0; border-bottom: 1px solid var(--rule-soft); } }
+
+/* ── the closing piece: what it won't do ── */
+.nots { list-style: none; margin: 0; padding: 0; counter-reset: not; }
+.nots li { counter-increment: not; position: relative; padding: 1rem 0 1rem 3.4rem; border-top: 1px solid var(--rule); }
+.nots li::before { content: counter(not); position: absolute; left: 0; top: .55rem; font: italic 300 2.4rem/1 var(--display); color: var(--red); font-variant-numeric: lining-nums; }
+.nots b { font-weight: 600; }
+
+/* ── the numbers ── */
+.numbers { background: var(--paper-2); margin-top: clamp(4rem, 9vw, 7rem); border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); }
+.numbers .in { max-width: 76rem; margin: 0 auto; padding: 2.5rem 1.5rem 2.75rem; }
+.numbers h2 { margin: 0 0 .4rem; font: 400 clamp(2rem, 4vw, 3rem)/1.05 var(--display); letter-spacing: -.02em; }
+.numbers .src { margin: 0 0 2rem; max-width: 46rem; color: var(--ink-2); font-style: italic; }
+.grid-n { display: grid; grid-template-columns: repeat(auto-fit, minmax(13.5rem, 1fr)); gap: 1.75rem 2.5rem; margin: 0; }
+.grid-n div { border-top: 1px solid var(--rule); padding-top: .6rem; }
+.grid-n dt { font: 300 clamp(2.6rem, 5vw, 3.6rem)/1 var(--display); letter-spacing: -.02em; font-variant-numeric: lining-nums; font-variation-settings: "opsz" 144; }
+.grid-n dt small { font-size: .42em; letter-spacing: 0; margin-left: .15em; color: var(--ink-2); }
+.grid-n dd { margin: .45rem 0 0; font-size: 1rem; line-height: 1.45; color: var(--ink-2); }
+
+/* ── the back of the issue: appendices ── */
+.back { max-width: 76rem; margin: 0 auto; padding: clamp(3.5rem, 8vw, 6rem) 1.5rem 0; }
+.back > header { max-width: calc(var(--measure) + var(--gutter) + var(--margin)); margin: 0 auto 1.75rem; border-top: 1px solid var(--ink); padding-top: 1.1rem; }
+.back .label { margin: 0 0 .3rem; font: italic 400 1.2rem/1 var(--display); color: var(--red); }
+.back h2 { margin: 0; font: 400 clamp(1.8rem, 3.6vw, 2.6rem)/1.08 var(--display); letter-spacing: -.015em; }
+.cli { margin: 1.5rem 0 0; font-size: 1rem; line-height: 1.45; }
+.cli h3 { margin: 1.8rem 0 .4rem; font: 600 .78rem/1.2 var(--text); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); }
+.cli dl { margin: 0; display: grid; grid-template-columns: 12.5rem 1fr; border-top: 1px solid var(--rule); }
+.cli dt, .cli dd { margin: 0; padding: .45rem 0; border-bottom: 1px solid var(--rule-soft); }
+.cli dt { font-family: var(--mono); font-size: .86rem; padding-right: 1.25rem; padding-top: .55rem; }
+@media (max-width: 560px) { .cli dl { grid-template-columns: 1fr; } .cli dt { border-bottom: 0; padding-bottom: 0; } }
+pre {
+  margin: .5rem 0 1.25rem; padding: .9rem 1rem; overflow-x: auto; border-radius: 5px;
+  background: var(--paper-2); border-left: 2px solid var(--red);
+  font: .84rem/1.55 var(--mono); font-variant-numeric: normal;
 }
-@media (max-width: 640px) {
-  .duo { grid-template-columns: 1fr; }
-  .path-grid, .stats { grid-template-columns: 1fr; }
-  .pin { width: 20px; height: 20px; line-height: 20px; font-size: 10px; }
-  .top .brand .sub, .top .seg.lang-seg { display: none; }
+.steps { margin: 0; padding: 0 0 0 1.3rem; }
+.steps > li { margin: 0 0 .6rem; }
+.steps > li::marker { color: var(--red); font-family: var(--display); font-style: italic; }
+
+footer.end { max-width: 76rem; margin: clamp(4rem, 9vw, 6rem) auto 0; padding: 1.25rem 1.5rem 3rem; border-top: 1px solid var(--ink); display: flex; flex-wrap: wrap; gap: 1rem 2rem; align-items: baseline; color: var(--ink-2); font-size: .95rem; }
+footer.end .tools { margin-left: auto; display: flex; gap: 1.1rem; }
+
+@media (max-width: 560px) {
+  body { font-size: 1.125rem; }
+  .folio { gap: .5rem 1rem; }
+  .folio .issue { order: 3; flex-basis: 100%; }
+  .runhead { padding: 0 1rem; }
+}
+@media (max-width: 1119px) { .back > header { max-width: var(--measure); } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+@media print {
+  .runhead, .folio .tools, footer.end .tools { display: none; }
+  body { background: #fff; }
 }
 </style>
 </head>
 <body>
+<a class="skip" href="#c1"><span data-l="es" lang="es">Saltar al primer capítulo</span><span data-l="en" lang="en">Skip to the first chapter</span></a>
 
-<header class="top">
-  <a class="brand" href="#top" aria-label="jmux">
-    <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#141619"/><path d="M16 20l12 12-12 12" stroke="#40C786" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><rect x="36" y="20" width="10" height="24" rx="2" fill="#E6E8EB"/></svg>
-    <span>jmux</span><span class="sub mono">terminal · agents</span>
-  </a>
-  <nav aria-label="sections">
-    <a href="#tour" data-i="nav.features"></a>
-    <a href="#perf" data-i="nav.perf"></a>
-    <a href="#honest" data-i="nav.honest"></a>
-    <a href="#install" data-i="nav.install"></a>
-  </nav>
-  <div class="spacer"></div>
-  <div class="seg lang-seg" role="group" aria-label="language" data-chord="L">
-    <button data-lang="es">ES</button><button data-lang="en">EN</button>
-  </div>
-  <div class="seg" role="group" aria-label="theme" data-chord="T">
-    <button data-themepref="dark" title="Dark">☾</button><button data-themepref="system" title="System">◐</button><button data-themepref="light" title="Light">☀</button>
-  </div>
-  <a class="btn primary" href="#install" data-i="cta.install"></a>
+<header class="folio">
+  <a class="mark" href="#top" id="top">jmux<i>.</i></a>
+  <span class="issue"><span data-l="es" lang="es">Número de octubre de 2026 · un terminal para macOS</span><span data-l="en" lang="en">October 2026 issue · a terminal for macOS</span></span>
+  <span class="tools">
+    <span class="switch" role="group" aria-label="Idioma / Language">
+      <button type="button" data-set-lang="es" lang="es">ES</button><span class="sep">/</span><button type="button" data-set-lang="en" lang="en">EN</button>
+    </span>
+    <span class="switch" role="group" aria-label="Tema / Theme">
+      <button type="button" data-set-theme="paper"><span data-l="es" lang="es">Papel</span><span data-l="en" lang="en">Paper</span></button><span class="sep">/</span><button type="button" data-set-theme="night"><span data-l="es" lang="es">Tinta</span><span data-l="en" lang="en">Ink</span></button><span class="sep">/</span><button type="button" data-set-theme="auto">Auto</button>
+    </span>
+  </span>
 </header>
 
-<main id="top">
-  <section class="hero">
-    <div class="wrap">
-      <span class="eyebrow" data-i-html="hero.eyebrow"></span>
-      <h1 data-i-html="hero.title"></h1>
-      <div class="hero-grid">
-        <div>
-          <p class="lede" data-i-html="hero.lede"></p>
-        </div>
-        <div class="hero-side">
-          <div class="install mono"><code id="hero-cmd">gh release download --repo javimoya/jmux --pattern 'jmux-*-macos-arm64.zip'</code><button class="copy" data-copy="#hero-cmd" data-i="copy"></button></div>
-          <div class="hero-ctas">
-            <a class="btn primary lg" href="#install" data-i="cta.install2"></a>
-            <a class="btn lg" href="#tour" data-i="cta.tour"></a>
-          </div>
-          <div class="meta-line" data-i-html="hero.meta"></div>
-        </div>
-      </div>
+<div class="runhead" aria-hidden="true">
+  <a class="mark" href="#top" tabindex="-1">jmux<i>.</i></a>
+  <span class="now"></span>
+  <span class="what"></span>
+  <span class="day"></span>
+</div>
 
-      <div class="shot-hero">
-        <div class="window" id="hero-window">
-          <img id="hero-img" src="shots/hero-dark.webp" width="2000" height="1249" alt="" data-dark="shots/hero-dark.webp" data-light="shots/hero-light.webp" data-i-alt="hero.alt">
-        </div>
-        <p class="hero-caption" data-i="hero.caption"></p>
-      </div>
-
-      <div class="stats" id="perf">
-        <div class="stat"><div class="n"><span data-i="stat.key.n"></span><small> ms</small></div><div class="d" data-i="stat.key"></div><div class="s">p50 · ADR-0003</div></div>
-        <div class="stat"><div class="n">204<small> ms</small></div><div class="d" data-i="stat.reattach"></div><div class="s" data-i="stat.reattach.s"></div></div>
-        <div class="stat"><div class="n">0<small data-i="stat.frames.n"></small></div><div class="d" data-i="stat.frames"></div><div class="s" data-i="stat.frames.s"></div></div>
-        <div class="stat"><div class="n">2<small> + ∞</small></div><div class="d" data-i="stat.agents"></div><div class="s" data-i="stat.agents.s"></div></div>
-      </div>
+<section class="cover" aria-labelledby="title">
+  <div class="sky">
+    <div class="sun" aria-hidden="true"></div>
+    <p class="over"><span data-l="es" lang="es">Claude Code y Codex, trabajando en tu Mac</span><span data-l="en" lang="en">Claude Code and Codex, at work on your Mac</span></p>
+    <h1 id="title"><span data-l="es" lang="es">La mesa <em>tranquila</em></span><span data-l="en" lang="en">The quiet <em>desk</em></span></h1>
+  </div>
+  <div class="horizon" aria-hidden="true"></div>
+  <div class="lower">
+    <div>
+      <p class="dek"><span data-l="es" lang="es">Un día entero dirigiendo agentes, del primer café al aterrizaje de medianoche. Lo que haces en la ventana de jmux, lo que ves en ella, y lo que jmux decide no hacer.</span><span data-l="en" lang="en">A full day of running agents, from the first coffee to the midnight landing. What you do in the jmux window, what you see there, and what jmux chooses not to do.</span></p>
+      <p class="credit"><span data-l="es" lang="es">Las figuras del Mac son capturas de la ventana real sobre proyectos de demostración, con agentes de verdad trabajando en ellos, recortadas a veces a lo que cuentan, y alguna con un trozo tapado o quitado. Las del teléfono son su app real contra el Mac simulado que trae el repositorio.</span><span data-l="en" lang="en">The Mac figures are captures of the real window on demo projects, with real agents working in them, sometimes cut down to what they tell, and a few with a passage blanked or taken out. The phone figures are its real app against the simulated Mac the repository ships.</span></p>
     </div>
-  </section>
+    <nav class="contents" aria-labelledby="toc">
+      <h2 id="toc"><span data-l="es" lang="es">En este número</span><span data-l="en" lang="en">In this issue</span></h2>
+      <ol>
+        <li><a href="#c1"><span class="h">07:40</span><span class="t"><span data-l="es" lang="es">Todo sigue ahí</span><span data-l="en" lang="en">Everything is still there</span></span></a></li>
+        <li><a href="#c2"><span class="h">08:55</span><span class="t"><span data-l="es" lang="es">El backlog es el plan</span><span data-l="en" lang="en">The backlog is the plan</span></span></a></li>
+        <li><a href="#c3"><span class="h">09:20</span><span class="t"><span data-l="es" lang="es">Repartir el trabajo</span><span data-l="en" lang="en">Handing out the work</span></span></a></li>
+        <li><a href="#c4"><span class="h">11:15</span><span class="t"><span data-l="es" lang="es">Las reglas, a la vista</span><span data-l="en" lang="en">The rules, in plain sight</span></span></a></li>
+        <li><a href="#c5"><span class="h">13:30</span><span class="t"><span data-l="es" lang="es">Uno escribe, otro lee</span><span data-l="en" lang="en">One writes, another reads</span></span></a></li>
+        <li><a href="#c6"><span class="h">16:10</span><span class="t"><span data-l="es" lang="es">Vete</span><span data-l="en" lang="en">Walk away</span></span></a></li>
+        <li><a href="#c7"><span class="h">18:40</span><span class="t"><span data-l="es" lang="es">Se acaba el contexto</span><span data-l="en" lang="en">The context runs out</span></span></a></li>
+        <li><a href="#c8"><span class="h">21:30</span><span class="t"><span data-l="es" lang="es">Lo del martes</span><span data-l="en" lang="en">That thing from Tuesday</span></span></a></li>
+        <li><a href="#c9"><span class="h">23:50</span><span class="t"><span data-l="es" lang="es">Aterriza</span><span data-l="en" lang="en">It lands</span></span></a></li>
+        <li><a href="#nots"><span class="h">✕</span><span class="t"><span data-l="es" lang="es">Lo que jmux no hará</span><span data-l="en" lang="en">What jmux won't do</span></span></a></li>
+        <li><a href="#numbers"><span class="h">№</span><span class="t"><span data-l="es" lang="es">Cifras y apéndices</span><span data-l="en" lang="en">Numbers and appendices</span></span></a></li>
+      </ol>
+    </nav>
+  </div>
+</section>
 
-  <section class="paths">
-    <div class="wrap">
-      <h2 data-i="paths.title"></h2>
-      <div class="path-grid" id="paths"></div>
-    </div>
-  </section>
+<main>
 
-  <section class="tour" id="tour">
-    <aside class="rail" aria-label="features">
-      <div class="rail-head"><span>PROJECTS</span><span class="count mono" id="count"></span></div>
-      <div class="filter" data-chord="/">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>
-        <input id="q" type="search" autocomplete="off" spellcheck="false" aria-label="Filter features">
-        <kbd>/</kbd>
-      </div>
-      <nav class="tree" id="tree"></nav>
-      <div class="rail-foot">
-        <button class="counter" data-filter="new"><span class="dot new"></span><span data-i="c.new"></span><span class="n" id="n-new">0</span></button>
-        <button class="counter" data-filter="open"><span class="dot open"></span><span data-i="c.open"></span><span class="n" id="n-open">0</span></button>
-        <button class="counter" data-filter="unseen"><span class="dot unseen"></span><span data-i="c.unseen"></span><span class="n" id="n-unseen">0</span></button>
-        <div class="rail-hint" data-i-html="c.hint"></div>
-      </div>
+<!-- ─────────────────────────────── 07:40 ─────────────────────────────── -->
+<article class="ch" id="c1" data-time="07:40">
+  <header class="ch-head">
+    <span class="time">07:40</span>
+    <h2><span data-l="es" lang="es">Todo sigue ahí</span><span data-l="en" lang="en">Everything is still there</span></h2>
+    <p class="stand"><span data-l="es" lang="es">Anoche cerraste la ventana con tres proyectos abiertos y un agente a medias. Esta mañana sigue a medias, en el mismo sitio.</span><span data-l="en" lang="en">Last night you closed the window with three projects open and an agent halfway through. This morning it is still halfway through, in the same place.</span></p>
+  </header>
+  <div class="col">
+    <aside class="how">
+      <h3><span data-l="es" lang="es">En la ventana</span><span data-l="en" lang="en">In the window</span></h3>
+      <ol>
+        <li><span data-l="es" lang="es"><kbd>⌘Q</kbd> y vuelve a abrir: todo sigue.</span><span data-l="en" lang="en"><kbd>⌘Q</kbd> and open it again: it all carries on.</span></li>
+        <li><span data-l="es" lang="es"><kbd>⌘J</kbd> la siguiente sesión activa.</span><span data-l="en" lang="en"><kbd>⌘J</kbd> the next active session.</span></li>
+        <li><span data-l="es" lang="es"><kbd>⌘⇧U</kbd> la que te está esperando.</span><span data-l="en" lang="en"><kbd>⌘⇧U</kbd> the one waiting on you.</span></li>
+        <li><span data-l="es" lang="es"><kbd>⌘D</kbd> divide a la derecha, <kbd>⌘⇧D</kbd> hacia abajo.</span><span data-l="en" lang="en"><kbd>⌘D</kbd> splits right, <kbd>⌘⇧D</kbd> down.</span></li>
+        <li><span data-l="es" lang="es"><kbd>⌘P</kbd> lista todas las acciones.</span><span data-l="en" lang="en"><kbd>⌘P</kbd> lists every action.</span></li>
+      </ol>
     </aside>
-    <div id="features"></div>
-  </section>
+    <p class="lead" data-l="es" lang="es">La ventana de jmux es lo único que cierras. Las terminales viven en otro proceso, jmuxd, que no depende de ella: sales con <kbd>⌘Q</kbd>, vuelves a abrir, y cada pestaña conserva su historial y su programa en marcha. El servidor de desarrollo ni se ha enterado.</p>
+    <p class="lead" data-l="en" lang="en">The jmux window is the only thing you close. The terminals live in another process, jmuxd, which does not depend on it: you quit with <kbd>⌘Q</kbd>, open it again, and every tab still has its scrollback and its program running. The dev server never noticed.</p>
+    <p data-l="es" lang="es">Si lo que se reinició fue el Mac, vuelve la disposición entera, con sus proyectos, pestañas y divisiones, y cada conversación de agente se retoma con la orden de su propio agente: <code>claude --resume</code> o <code>codex resume</code>. Un reinicio sí se lleva los procesos; las conversaciones no. Y actualizar jmux no cuesta ninguno: el demonio nuevo recoge las terminales vivas del viejo, y si el traspaso falla, el viejo sigue sirviendo.</p>
+    <p data-l="en" lang="en">If what restarted was the Mac, the whole layout comes back, with its projects, tabs and splits, and every agent conversation resumes with its own agent's command: <code>claude --resume</code> or <code>codex resume</code>. A reboot does take the processes; it does not take the conversations. Updating jmux costs none of them: the new daemon takes the live terminals over from the old one, and if the handover fails, the old one keeps serving.</p>
+    <aside class="wont">
+      <h3><span data-l="es" lang="es">No hace</span><span data-l="en" lang="en">It won't</span></h3>
+      <p><span data-l="es" lang="es">Renombrar tus sesiones. Cada una nace con el nombre de su proyecto y un número, y solo tú se lo cambias: ni tu primer mensaje ni el título que se invente el agente.</span><span data-l="en" lang="en">Rename your sessions. Each is born with its project's name and a number, and only you change it: not your first message, not a title the agent makes up.</span></p>
+    </aside>
+    <p data-l="es" lang="es">La barra lateral es el mapa del trabajo. Cada proyecto con sus sesiones debajo, y cada agente dice en qué está: trabajando, parado porque necesita algo de ti, o con algo nuevo que aún no has visto. Al pie, tres contadores para esas tres cosas. Los hijos de un agente cuelgan de él, y una fila plegada lleva el estado más urgente de lo que esconde.</p>
+    <p data-l="en" lang="en">The sidebar is the map of the work. Each project with its sessions under it, and each agent says where it stands: working, stopped because it needs something from you, or holding something new you have not seen. At the foot, three counters for those three things. An agent's children hang under it, and a folded row wears the most urgent state of what it hides.</p>
+    <figure class="fig bleed">
+      <div class="plate"><a class="zoom" href="shots/team.webp"><img src="shots/team.webp" srcset="shots/team-960.webp 960w, shots/team.webp 1600w" sizes="(min-width: 1120px) 72rem, 100vw" width="1600" height="1000" loading="lazy" decoding="async"
+        data-alt-es="La ventana de jmux: a la izquierda, la barra lateral con tres proyectos; bajo payments-api 1, el líder, cuelgan Builder 1 con un martillo y Reviewer 1 con un ojo, y al pie los contadores Working 1, Blocked 0 y Unseen 2. En el centro, el informe del constructor en la conversación del líder; a la derecha, el tablero del backlog y, debajo, el servidor de desarrollo sirviendo peticiones."
+        data-alt-en="The jmux window: on the left, the sidebar with three projects; under payments-api 1, the lead, hang Builder 1 with a hammer and Reviewer 1 with an eye, and at its foot the counters Working 1, Blocked 0 and Unseen 2. In the middle, the builder's report in the lead's conversation; on the right, the backlog board and, below it, the dev server serving requests."
+        alt="La ventana de jmux: a la izquierda, la barra lateral con tres proyectos; bajo payments-api 1, el líder, cuelgan Builder 1 con un martillo y Reviewer 1 con un ojo, y al pie los contadores Working 1, Blocked 0 y Unseen 2. En el centro, el informe del constructor en la conversación del líder; a la derecha, el tablero del backlog y, debajo, el servidor de desarrollo sirviendo peticiones."></a>
+        <span class="pin" style="--x:1%;--y:8.4%">1</span><span class="pin" style="--x:10.2%;--y:11.7%">2</span><span class="pin" style="--x:1.4%;--y:14.9%">3</span><span class="pin" style="--x:25.5%;--y:18.2%">4</span><span class="pin" style="--x:88.6%;--y:26.1%">5</span><span class="pin" style="--x:12%;--y:95.5%">6</span><span class="pin" style="--x:93%;--y:72%">7</span></div>
+      <figcaption><span data-l="es" lang="es">Una mañana en payments-api. <span class="k">1</span>El líder, con el color de su perfil. <span class="k">2</span>Su constructor, que acaba de terminar, y <span class="k">3</span>su revisor, que lee. Cada fila dice cuánto contexto lleva. <span class="k">4</span>El informe del constructor, en la conversación del líder, que lo repasa antes de pedir la revisión. <span class="k">5</span>En el tablero, las dos entradas en curso llevan el nombre del líder. <span class="k">6</span>Al pie, los tres contadores: uno trabajando, nadie parado, dos cosas sin ver. <span class="k">7</span>El servidor de desarrollo, que sigue sirviendo.</span><span data-l="en" lang="en">A morning in payments-api. <span class="k">1</span>The lead, in its profile's colour. <span class="k">2</span>Its builder, just finished, and <span class="k">3</span>its reviewer, reading. Each row says how much context it has used. <span class="k">4</span>The builder's report, in the lead's conversation, which goes over it before asking for the review. <span class="k">5</span>On the board, the two entries in progress carry the lead's name. <span class="k">6</span>At the foot, the three counters: one working, none blocked, two things unseen. <span class="k">7</span>The dev server, still serving.</span></figcaption>
+    </figure>
+  </div>
+</article>
 
-  <section class="band" id="honest">
-    <div class="wrap">
-      <p class="kicker mono" data-i="honest.kicker"></p>
-      <h2 data-i="honest.title"></h2>
-      <p class="lede" data-i="honest.lede"></p>
-      <div class="cols" id="honest-cols"></div>
-    </div>
-  </section>
+<!-- ─────────────────────────────── 08:55 ─────────────────────────────── -->
+<article class="ch" id="c2" data-time="08:55">
+  <header class="ch-head">
+    <span class="time">08:55</span>
+    <h2><span data-l="es" lang="es">El backlog es el plan</span><span data-l="en" lang="en">The backlog is the plan</span></h2>
+    <p class="stand"><span data-l="es" lang="es">Lo que hay que hacer ya está escrito, en tu repositorio y en Markdown. jmux lo pone en un tablero y te deja empezar desde ahí.</span><span data-l="en" lang="en">What needs doing is already written down, in your repository, in Markdown. jmux lays it out on a board and lets you start from there.</span></p>
+  </header>
+  <div class="col">
+    <aside class="how">
+      <h3><span data-l="es" lang="es">En la ventana</span><span data-l="en" lang="en">In the window</span></h3>
+      <ol>
+        <li><span data-l="es" lang="es">Clic derecho en el proyecto, <span class="ui">Backlog</span>.</span><span data-l="en" lang="en">Right-click the project, <span class="ui">Backlog</span>.</span></li>
+        <li><span data-l="es" lang="es"><kbd>N</kbd> mete una entrada en <span class="ui">Next</span>; <kbd>⌥↑</kbd> <kbd>⌥↓</kbd> la ordenan.</span><span data-l="en" lang="en"><kbd>N</kbd> puts an entry in <span class="ui">Next</span>; <kbd>⌥↑</kbd> <kbd>⌥↓</kbd> order it.</span></li>
+        <li><span data-l="es" lang="es"><span class="ui">Work on…</span>, elige el perfil, <span class="ui">Start</span> <kbd>⌘↩</kbd>.</span><span data-l="en" lang="en"><span class="ui">Work on…</span>, pick the profile, <span class="ui">Start</span> <kbd>⌘↩</kbd>.</span></li>
+      </ol>
+    </aside>
+    <p data-l="es" lang="es">Cada proyecto puede llevar su registro en <code>.gg/</code>: el backlog con lo pedido y aún no hecho, el diseño tal como es hoy, el glosario y el runbook. Son ficheros de texto que versiona git y que cualquier agente lee, con jmux o sin él. jmux no los guarda: los muestra y escribe en ellos con cuidado. Los números de las entradas los reparte el demonio, para que dos agentes que apuntan cosas a la vez, cada uno en su rama, no choquen.</p>
+    <p data-l="en" lang="en">Every project can keep its record in <code>.gg/</code>: the backlog of what was asked and is not done yet, the design as it stands today, the glossary and the runbook. They are text files git keeps and any agent reads, with jmux or without it. jmux does not keep them: it shows them and writes to them with care. The daemon hands out the entries' numbers, so two agents writing things down at once, each on its own branch, never collide.</p>
+    <p data-l="es" lang="es">El tablero ordena las entradas por lo que está pasando, no por su tipo. <span class="ui">In Progress</span>, con quién trabaja en cada una. <span class="ui">Next</span>, tu lista corta, en tu orden. <span class="ui">Everything Else</span>, lo demás. Desde una entrada, <span class="ui">Work on…</span> abre una tarjeta pequeña: lo que has elegido, un perfil y una línea que dice qué va a abrir <span class="ui">Start</span>. Con Solo, una sesión de Claude o de Codex. Con Team, un líder con el que hablas.</p>
+    <p data-l="en" lang="en">The board sorts entries by what is happening, not by kind. <span class="ui">In Progress</span>, with who is on each one. <span class="ui">Next</span>, your short list, in your order. <span class="ui">Everything Else</span>, the rest. From an entry, <span class="ui">Work on…</span> opens a small card: what you picked, a profile and one line saying what <span class="ui">Start</span> will open. With Solo, one Claude or Codex session. With Team, a lead you talk to.</p>
+    <aside class="wont">
+      <h3><span data-l="es" lang="es">No hace</span><span data-l="en" lang="en">It won't</span></h3>
+      <p><span data-l="es" lang="es">Guardar un plan propio. El plan es lo que el líder dice en su conversación, donde lo lees y le contestas.</span><span data-l="en" lang="en">Keep a plan of its own. The plan is what the lead says in its conversation, where you read it and answer it.</span></p>
+    </aside>
+    <p data-l="es" lang="es">Al pulsar <span class="ui">Start</span>, la entrada queda atada a la sesión, y el tablero lo muestra. En la figura 2 el líder de Team ha leído el código antes de proponer nada, ha visto que los tests ni siquiera se ejecutaban, y propone partir el trabajo en dos piezas, una detrás de otra. No empieza hasta que le dices que sí.</p>
+    <p data-l="en" lang="en">Press <span class="ui">Start</span>: the entry is tied to the session, and the board shows it. In figure 2 the Team lead has read the code before proposing anything, seen that the tests were not even running, and proposes splitting the work into two parts, one after the other. It does not start until you say yes.</p>
+    <figure class="fig bleed">
+      <div class="plate"><a class="zoom" href="shots/plan.webp"><img src="shots/plan.webp" srcset="shots/plan-960.webp 960w, shots/plan.webp 1600w" sizes="(min-width: 1120px) 72rem, 100vw" width="1600" height="1000" loading="lazy" decoding="async"
+        data-alt-es="El líder pregunta «Start B-01 then B-02 with this split?» con las opciones Yes, start y Change the plan. A la derecha, el tablero del backlog con dos entradas en In Progress atadas a payments-api 1, una en Next y dos en Everything Else."
+        data-alt-en="The lead asks “Start B-01 then B-02 with this split?” with the options Yes, start and Change the plan. On the right, the backlog board with two entries In Progress tied to payments-api 1, one in Next and two in Everything Else."
+        alt="El líder pregunta «Start B-01 then B-02 with this split?» con las opciones Yes, start y Change the plan. A la derecha, el tablero del backlog con dos entradas en In Progress atadas a payments-api 1, una en Next y dos en Everything Else."></a>
+        <span class="pin" style="--x:18.6%;--y:8.3%">1</span><span class="pin" style="--x:24%;--y:71%">2</span><span class="pin" style="--x:73.4%;--y:9.1%">3</span><span class="pin" style="--x:89%;--y:20.2%">4</span><span class="pin" style="--x:69%;--y:35.8%">5</span></div>
+      <figcaption><span data-l="es" lang="es"><span class="k">1</span>El líder, parado porque espera algo de ti. <span class="k">2</span>Su pregunta: empezar con esta partición o cambiar el plan. <span class="k">3</span>El tablero de <code>.gg/BACKLOG.md</code>, con su vista de documento al lado. <span class="k">4</span>Dos entradas en curso, con el nombre de quien trabaja en ellas. <span class="k">5</span><span class="ui">Next</span>, tu lista corta, y <span class="ui">Work on These…</span> para empezarla.</span><span data-l="en" lang="en"><span class="k">1</span>The lead, stopped because it waits on you. <span class="k">2</span>Its question: start with this split, or change the plan. <span class="k">3</span>The board of <code>.gg/BACKLOG.md</code>, its document view beside it. <span class="k">4</span>Two entries in progress, with the name of who works on them. <span class="k">5</span><span class="ui">Next</span>, your short list, and <span class="ui">Work on These…</span> to start it.</span></figcaption>
+    </figure>
+  </div>
+</article>
 
-  <section class="band" id="install">
-    <div class="wrap install-steps">
-      <p class="kicker mono" data-i="install.kicker"></p>
-      <h2 data-i="install.title"></h2>
-      <p class="lede" data-i="install.lede"></p>
-      <div id="install-body"></div>
-    </div>
-  </section>
+<!-- ─────────────────────────────── 09:20 ─────────────────────────────── -->
+<article class="ch" id="c3" data-time="09:20">
+  <header class="ch-head">
+    <span class="time">09:20</span>
+    <h2><span data-l="es" lang="es">Repartir el trabajo</span><span data-l="en" lang="en">Handing out the work</span></h2>
+    <p class="stand"><span data-l="es" lang="es">Hablas con un agente. Él habla con los demás. Ninguno puede más que tú.</span><span data-l="en" lang="en">You talk to one agent. It talks to the rest. None of them can do more than you.</span></p>
+  </header>
+  <div class="col">
+    <aside class="how">
+      <h3><span data-l="es" lang="es">En la ventana</span><span data-l="en" lang="en">In the window</span></h3>
+      <ol>
+        <li><span data-l="es" lang="es">Menú <span class="ui">+</span> del proyecto, una línea por perfil.</span><span data-l="en" lang="en">The project's <span class="ui">+</span> menu, one line per profile.</span></li>
+        <li><span data-l="es" lang="es">Clic derecho en el proyecto, <span class="ui">Profile ▸</span>.</span><span data-l="en" lang="en">Right-click the project, <span class="ui">Profile ▸</span>.</span></li>
+        <li><span data-l="es" lang="es">Clic derecho en el líder, <span class="ui">Edit Workflow…</span></span><span data-l="en" lang="en">Right-click the lead, <span class="ui">Edit Workflow…</span></span></li>
+        <li><span data-l="es" lang="es">En la bandeja: <span class="ui">Confirm Child Sessions Before They Start</span>.</span><span data-l="en" lang="en">In the tray: <span class="ui">Confirm Child Sessions Before They Start</span>.</span></li>
+      </ol>
+    </aside>
+    <p data-l="es" lang="es">Un perfil es una forma de trabajar: quién dirige y por qué pasos va el trabajo. jmux trae cuatro. Solo es un agente sin nada alrededor. Checked, un agente que pide revisiones y decide qué arreglar. Team y Thorough te dan un líder con el que hablas, que parte el trabajo en piezas y lleva cada una por su camino. Los cambias, o haces los tuyos, en <span class="ui">Settings ▸ Profiles</span>, y un líder se queda con una copia del suyo que puedes tocar sin tocar el perfil.</p>
+    <p data-l="en" lang="en">A profile is a way of working: who leads, and the steps the work goes through. jmux ships four. Solo is one agent with nothing around it. Checked is one agent that asks for reviews and decides what to fix. Team and Thorough give you a lead you talk to, which splits the work into parts and takes each one through its steps. You change them, or make your own, in <span class="ui">Settings ▸ Profiles</span>, and a lead keeps a copy of its own you can edit without touching the profile.</p>
+    <p data-l="es" lang="es">El líder pide cada hijo y jmux lo arranca. Un constructor puede tener su propio worktree de git, en una rama suya, o trabajar en la copia del líder. Dos hijos nunca escriben a la vez en la misma copia, y el líder nunca se queda esperando a que una quede libre. Un revisor solo puede leer. En la barra lateral cuelgan del líder, con un martillo el que construye y un ojo el que lee. Cuando un hijo termina, su informe llega a la conversación del líder como un mensaje, y ahí lo lees tú también.</p>
+    <p data-l="en" lang="en">The lead asks for each child and jmux starts it. A builder can get its own git worktree, on a branch of its own, or work in the lead's checkout. Two children never write in one checkout at once, and the lead never waits for one to come free. A reviewer can only read. In the sidebar they hang under the lead, a hammer for the one that builds, an eye for the one that reads. When a child finishes, its report reaches the lead's conversation as a message, and you read it there too.</p>
+    <figure class="fig side">
+      <img src="shots/tree.webp" width="520" height="480" loading="lazy" decoding="async" data-alt-es="Detalle de la barra lateral: payments-api 1, el líder, y colgando de él Builder 1 con un martillo y Reviewer 1 con un ojo." data-alt-en="Detail of the sidebar: payments-api 1, the lead, and under it Builder 1 with a hammer and Reviewer 1 with an eye." alt="Detalle de la barra lateral: payments-api 1, el líder, y colgando de él Builder 1 con un martillo y Reviewer 1 con un ojo.">
+      <figcaption><span data-l="es" lang="es">El martillo construye, el ojo lee. Los dos cuelgan de quien los pidió.</span><span data-l="en" lang="en">The hammer builds, the eye reads. Both hang under whoever asked for them.</span></figcaption>
+    </figure>
+    <p class="pull"><span data-l="es" lang="es">Nunca más que su padre.</span><span data-l="en" lang="en">Never more than its parent.</span></p>
+    <aside class="note"><span data-l="es" lang="es">Tampoco es un sandbox: un agente con una shell puede rodear muchas cosas. Lo que jmux hace cumplir es el permiso de las sesiones que arranca.</span><span data-l="en" lang="en">It is not a sandbox either: an agent with a shell can get around a lot. What jmux enforces is the permission of the sessions it starts.</span></aside>
+    <p data-l="es" lang="es">Un hijo arranca con el permiso de quien lo pidió y nunca con uno mayor; si el permiso del padre no se conoce, el hijo no arranca. Un revisor es de solo lectura, tenga el permiso que tenga su padre. Y si quieres ver a cada hijo antes de que exista, enciende en la bandeja de la barra de título <span class="ui">Confirm Child Sessions Before They Start</span>: cada uno te enseña su agente, su modelo, dónde va a trabajar, su rama y su permiso, y espera a que pulses <span class="ui">Start Session</span>.</p>
+    <p data-l="en" lang="en">A child starts with the permission of whoever asked for it, never a larger one; if the parent's permission is unknown, the child does not start. A reviewer reads only, whatever its parent may do. And if you want to see each child before it exists, turn on <span class="ui">Confirm Child Sessions Before They Start</span> in the title bar's tray: each one shows you its agent, its model, where it will work, its branch and its permission, and waits for <span class="ui">Start Session</span>.</p>
+    <aside class="wont">
+      <h3><span data-l="es" lang="es">No hace</span><span data-l="en" lang="en">It won't</span></h3>
+      <p><span data-l="es" lang="es">Llevar el flujo por ti. jmux no reparte turnos ni espera veredictos. El flujo lo lleva el líder, un agente en su propia terminal que dice cada paso en voz alta.</span><span data-l="en" lang="en">Run the workflow for you. jmux schedules nothing and waits on no verdict. The lead runs the workflow: an agent in its own terminal that says every step out loud.</span></p>
+    </aside>
+    <figure class="fig phones two">
+      <div class="row">
+        <img class="for-paper" src="shots/phone-children-light.webp" width="448" height="997" loading="lazy" decoding="async" data-alt-es="Teléfono: la pestaña Children de un líder, con la tarjeta «asks to start a child» y los botones Decline y Approve, y debajo sus hijos por pieza." data-alt-en="Phone: a lead's Children tab, with the card “asks to start a child” and the Decline and Approve buttons, and its children by part below." alt="Teléfono: la pestaña Children de un líder, con la tarjeta «asks to start a child» y los botones Decline y Approve, y debajo sus hijos por pieza.">
+        <img class="for-night" src="shots/phone-children-dark.webp" width="448" height="997" loading="lazy" decoding="async" data-alt-es="Teléfono: la pestaña Children de un líder, con la tarjeta «asks to start a child» y los botones Decline y Approve, y debajo sus hijos por pieza." data-alt-en="Phone: a lead's Children tab, with the card “asks to start a child” and the Decline and Approve buttons, and its children by part below." alt="Teléfono: la pestaña Children de un líder, con la tarjeta «asks to start a child» y los botones Decline y Approve, y debajo sus hijos por pieza.">
+        <img class="for-paper" src="shots/phone-sessions-light.webp" width="448" height="997" loading="lazy" decoding="async" data-alt-es="Teléfono: la lista de sesiones filtrada por Working: un constructor, un líder de Team y una sesión Solo a la que le negaron un paso." data-alt-en="Phone: the session list filtered to Working: a builder, a Team lead and a Solo session that was refused a step." alt="Teléfono: la lista de sesiones filtrada por Working: un constructor, un líder de Team y una sesión Solo a la que le negaron un paso.">
+        <img class="for-night" src="shots/phone-sessions-dark.webp" width="448" height="997" loading="lazy" decoding="async" data-alt-es="Teléfono: la lista de sesiones filtrada por Working: un constructor, un líder de Team y una sesión Solo a la que le negaron un paso." data-alt-en="Phone: the session list filtered to Working: a builder, a Team lead and a Solo session that was refused a step." alt="Teléfono: la lista de sesiones filtrada por Working: un constructor, un líder de Team y una sesión Solo a la que le negaron un paso.">
+      </div>
+      <figcaption><span data-l="es" lang="es">Lo mismo, en el bolsillo. A la izquierda, un líder pide arrancar un hijo y espera tu aprobación, con sus hijos agrupados por pieza debajo. A la derecha, quién está trabajando ahora mismo, con su perfil y desde cuándo.</span><span data-l="en" lang="en">The same, in your pocket. On the left, a lead asks to start a child and waits for your approval, its children grouped by part below. On the right, who is working right now, with its profile and for how long.</span></figcaption>
+    </figure>
+  </div>
+</article>
+
+<!-- ─────────────────────────────── 11:15 ─────────────────────────────── -->
+<article class="ch" id="c4" data-time="11:15">
+  <header class="ch-head">
+    <span class="time">11:15</span>
+    <h2><span data-l="es" lang="es">Las reglas, a la vista</span><span data-l="en" lang="en">The rules, in plain sight</span></h2>
+    <p class="stand"><span data-l="es" lang="es">Qué puede hacer un agente sin preguntarte, escrito en tarjetas que se leen como frases.</span><span data-l="en" lang="en">What an agent may do without asking you, written on cards that read as sentences.</span></p>
+  </header>
+  <div class="col">
+    <aside class="how">
+      <h3><span data-l="es" lang="es">En la ventana</span><span data-l="en" lang="en">In the window</span></h3>
+      <ol>
+        <li><span data-l="es" lang="es"><span class="ui">Settings ▸ Rules</span>, o <span class="ui">Rules…</span> en el clic derecho del proyecto.</span><span data-l="en" lang="en"><span class="ui">Settings ▸ Rules</span>, or <span class="ui">Rules…</span> on the project's right-click.</span></li>
+        <li><span data-l="es" lang="es"><span class="ui">This Mac</span> arriba; cada proyecto debajo.</span><span data-l="en" lang="en"><span class="ui">This Mac</span> at the top; each project below.</span></li>
+        <li><span data-l="es" lang="es">Debajo del lienzo: <span class="ui">Your lead, on its own</span>.</span><span data-l="en" lang="en">Under the canvas: <span class="ui">Your lead, on its own</span>.</span></li>
+      </ol>
+    </aside>
+    <p data-l="es" lang="es">En <span class="ui">Settings ▸ Rules</span> hay tres franjas: antes de un commit, el commit, y cuando aterriza. En ellas, cinco tarjetas, y cada una dice su regla en una frase que podrías decirle a un compañero: hace commit solo en cada cambio coherente; solo hace push a través del despliegue, y un <code>git push</code> suelto te pregunta. Debajo, una sexta línea: en qué idioma te contestan las sesiones. Las de <span class="ui">This Mac</span> valen en todos los proyectos. Un proyecto puede añadir las suyas y hacerlas más estrictas, nunca más laxas.</p>
+    <p data-l="en" lang="en"><span class="ui">Settings ▸ Rules</span> has three bands: before a commit, the commit, and once it lands. On them, five cards, and each one says its rule in a sentence you could say to a colleague: commits on its own at each coherent change; pushes only through the deploy, and a loose <code>git push</code> asks you. Below them, a sixth line: the language sessions answer you in. The ones under <span class="ui">This Mac</span> hold in every project. A project can add its own and make them stricter, never looser.</p>
+    <figure class="fig wide cardsfig">
+      <div class="cards">
+        <div class="band">
+          <h4><span data-l="es" lang="es">Antes de un commit</span><span data-l="en" lang="en">Before a commit</span></h4>
+          <dl><dt>Checks</dt><dd><code>make quick</code> · A commit needs this passed.</dd></dl>
+        </div>
+        <div class="band">
+          <h4><span data-l="es" lang="es">El commit</span><span data-l="en" lang="en">The commit</span></h4>
+          <dl><dt>Commit</dt><dd>Commits on its own at each coherent change.</dd>
+          <dt>Push <span class="shield" title="guardrail">⛉</span></dt><dd>Pushes only through the deploy; a loose git push asks you.</dd></dl>
+        </div>
+        <div class="band">
+          <h4><span data-l="es" lang="es">Cuando aterriza</span><span data-l="en" lang="en">Once it lands</span></h4>
+          <dl><dt>Landing</dt><dd>After a commit lands on the main branch, runs <code>make install</code>. On any other branch, runs <code>make install RELEASE=0</code>.</dd>
+          <dt>Site</dt><dd>When a change that shows on the site lands, publishes it with <code>scripts/publish-site.sh</code>.</dd></dl>
+          <p class="bandnote">A branch lands only after <code>make check</code> passes on it.</p>
+        </div>
+      </div>
+      <figcaption><span data-l="es" lang="es">Las cinco tarjetas del propio repositorio de jmux, compuestas aquí a mano: no es una captura. Las frases en inglés son las que jmux escribe en ellas, palabra por palabra. El escudo marca una barrera.</span><span data-l="en" lang="en">The five cards of jmux's own repository, typeset here by hand: this is not a capture. The sentences are the ones jmux writes on them, word for word. The shield marks a guardrail.</span></figcaption>
+    </figure>
+    <p data-l="es" lang="es">Una tarjeta con escudo es una barrera: Claude se detiene de verdad ante esa orden, y te pregunta o se niega si la regla dice never. Sin escudo, la regla se le dice al agente al empezar. A Codex, por ahora, todas se le dicen. Lo que guardas vale para las sesiones que empiecen después; las abiertas siguen con las reglas con las que nacieron, y la pantalla te lo recuerda al guardar.</p>
+    <p data-l="en" lang="en">A card with a shield is a guardrail: Claude really stops at that command, and asks you or refuses where the rule says never. Without one, the rule is told to the agent when it starts. Codex, for now, is told all of them. What you save holds for sessions that start afterwards; the open ones keep the rules they were born with, and the screen reminds you when you save.</p>
+    <aside class="wont">
+      <h3><span data-l="es" lang="es">No hace</span><span data-l="en" lang="en">It won't</span></h3>
+      <p><span data-l="es" lang="es">Llamarte desde fuera de la ventana. Ni globo en el Dock, ni notificación de macOS, ni un sonido suyo: el pitido de un programa en una terminal suena como en cualquier terminal. Lo que te necesita está en una tarjeta, en su fila y en la campana de la barra de título.</span><span data-l="en" lang="en">Call you from outside the window. No Dock badge, no macOS notification, no sound of its own: a program's beep in a terminal sounds as in any terminal. What needs you is on a card, on its row and under the bell in the title bar.</span></p>
+    </aside>
+    <p data-l="es" lang="es">Debajo del lienzo está lo que tú le dejas a tu líder: <span class="ui">Your lead, on its own</span>. Hacer commit, aterrizar e instalar, publicar el sitio. Al encender uno, jmux te enseña antes qué da exactamente, por ejemplo aterrizar una rama en main solo cuando ha pasado su comprobación completa, y no cambia nada hasta que confirmas.</p>
+    <p data-l="en" lang="en">Under the canvas is what you leave to your lead: <span class="ui">Your lead, on its own</span>. Committing, landing and installing, publishing the site. When you turn one on, jmux first shows what exactly it gives, such as landing a branch on main only once its full check has passed, and changes nothing until you confirm.</p>
+    <p data-l="es" lang="es">Y cuando el control de seguridad del modo auto de Claude para un paso de tu líder, aparece una tarjeta junto a su fila sin quitarte el teclado: por qué lo paró Claude, el paso exacto, y tres botones, <span class="ui">No</span>, <span class="ui">Once</span> y <span class="ui">Allow for this project</span>. El último no tiene atajo, a propósito. Si no contestas en veinte segundos, el líder aparca ese paso y sigue con otra cosa, y tu respuesta le llega después.</p>
+    <p data-l="en" lang="en">And when Claude's auto-mode safety check stops one of your lead's steps, a card appears beside its row without taking your keyboard: why Claude stopped it, the exact step, and three buttons, <span class="ui">No</span>, <span class="ui">Once</span> and <span class="ui">Allow for this project</span>. The last has no shortcut, on purpose. If you do not answer within twenty seconds, the lead parks that step and gets on with something else, and your answer reaches it later.</p>
+  </div>
+</article>
+
+<!-- ─────────────────────────────── 13:30 ─────────────────────────────── -->
+<article class="ch" id="c5" data-time="13:30">
+  <header class="ch-head">
+    <span class="time">13:30</span>
+    <h2><span data-l="es" lang="es">Uno escribe, otro lee</span><span data-l="en" lang="en">One writes, another reads</span></h2>
+    <p class="stand"><span data-l="es" lang="es">Lo que construyó un modelo lo revisa otro. Las conclusiones las saca el líder, y por escrito.</span><span data-l="en" lang="en">What one model built, another reviews. The lead draws the conclusions, in writing.</span></p>
+  </header>
+  <div class="col">
+    <aside class="how">
+      <h3><span data-l="es" lang="es">En la ventana</span><span data-l="en" lang="en">In the window</span></h3>
+      <ol>
+        <li><span data-l="es" lang="es"><span class="ui">Settings ▸ Profiles</span>: rondas, lectores y listón.</span><span data-l="en" lang="en"><span class="ui">Settings ▸ Profiles</span>: rounds, readers and bar.</span></li>
+        <li><span data-l="es" lang="es">Una revisión suelta: clic derecho en una sesión, <span class="ui">Review changes</span>.</span><span data-l="en" lang="en">A one-off review: right-click a session, <span class="ui">Review changes</span>.</span></li>
+      </ol>
+    </aside>
+    <p data-l="es" lang="es">En el perfil decides cómo se revisa: cada pieza y el conjunto, cuántas rondas, cuántos lectores por ronda, y con qué listón se arregla lo que encuentran, desde <span class="ui">Only what breaks</span> hasta <span class="ui">Everything worth fixing</span>. En Team, Opus lee lo que construyó Sonnet. En Thorough lee primero Codex, después de los arreglos lee Opus, y el conjunto lo leen los dos a la vez.</p>
+    <p data-l="en" lang="en">In the profile you decide how review goes: each part and the whole, how many rounds, how many readers per round, and how high the bar is for fixing what they find, from <span class="ui">Only what breaks</span> to <span class="ui">Everything worth fixing</span>. In Team, Opus reads what Sonnet built. In Thorough, Codex reads first, Opus reads after the fixes, and both read the whole together.</p>
+    <p data-l="es" lang="es">Un revisor es un hijo que solo puede leer, y el demonio rechaza cualquier cosa suya que no sea leer. Recibe el diff y la lista de ficheros. Si el proyecto tiene una prueba propia (un <em>try</em>, que monta el cambio aparte y deja escrito lo que vio), recibe también su carpeta, para juzgar lo que vería una persona y no solo el código.</p>
+    <p data-l="en" lang="en">A reviewer is a child that can only read, and the daemon refuses anything from it that is not reading. It gets the diff and the list of files. If the project has a try of its own (which builds the change apart and writes down what it saw), it gets that folder too, to judge what a person would see and not only the code.</p>
+    <aside class="wont">
+      <h3><span data-l="es" lang="es">No hace</span><span data-l="en" lang="en">It won't</span></h3>
+      <p><span data-l="es" lang="es">Decidir por el líder ni por ti. Nada en jmux lee el informe, lo clasifica o aprueba un cambio por su cuenta.</span><span data-l="en" lang="en">Decide for the lead, or for you. Nothing in jmux reads the report, sorts it or approves a change on its own.</span></p>
+    </aside>
+    <p data-l="es" lang="es">El informe llega entero a la conversación del líder. El líder decide cada hallazgo, arreglar ahora, más tarde o no, y escribe por qué. Esta vez, lo que dejó para más tarde lo apuntó el propio líder en el backlog. Tú lees esas decisiones donde las escribe y, si el perfil lo pide, nada aterriza sin que digas que sí.</p>
+    <p data-l="en" lang="en">The report reaches the lead's conversation whole. The lead rules on each finding, fix now, later or no, and writes why. This time the lead wrote what it left for later into the backlog itself. You read those rulings where it writes them and, if the profile asks for it, nothing lands until you say yes.</p>
+    <figure class="fig" id="fig-review">
+      <a class="zoom" href="shots/review-report.webp"><img src="shots/review-report.webp" srcset="shots/review-report-700.webp 700w, shots/review-report.webp 1100w" sizes="(min-width: 600px) 35rem, 100vw" width="1100" height="482" loading="lazy" decoding="async"
+        data-alt-es="La conversación del líder: el final del informe del revisor, con lo que leyó y lo que no pudo probar." data-alt-en="The lead's conversation: the end of the reviewer's report, with what it read and what it could not try." alt="La conversación del líder: el final del informe del revisor, con lo que leyó y lo que no pudo probar."></a>
+      <a class="zoom" href="shots/review-rulings.webp"><img src="shots/review-rulings.webp" srcset="shots/review-rulings-700.webp 700w, shots/review-rulings.webp 1100w" sizes="(min-width: 600px) 35rem, 100vw" width="1100" height="443" loading="lazy" decoding="async"
+        data-alt-es="Unas líneas más abajo, «Whole-change round 1 rulings»: el líder decide los tres hallazgos, Fix, Fix y No, y dice por qué." data-alt-en="A few lines further on, “Whole-change round 1 rulings”: the lead rules on the three findings, Fix, Fix and No, and says why." alt="Unas líneas más abajo, «Whole-change round 1 rulings»: el líder decide los tres hallazgos, Fix, Fix y No, y dice por qué."></a>
+      <figcaption><span data-l="es" lang="es">La revisión del cambio entero, en dos trozos de la conversación del líder. Arriba, el final del informe del revisor: lo que leyó y lo que no pudo probar. Abajo, unas líneas más allá, el líder decide cada hallazgo: arreglar, arreglar, no.</span><span data-l="en" lang="en">The review of the whole change, in two pieces of the lead's conversation. Above, the end of the reviewer's report: what it read and what it could not try. Below, a few lines further on, the lead rules on each finding: fix, fix, no.</span></figcaption>
+    </figure>
+  </div>
+</article>
+
+<!-- ─────────────────────────────── 16:10 ─────────────────────────────── -->
+<article class="ch" id="c6" data-time="16:10">
+  <header class="ch-head">
+    <span class="time">16:10</span>
+    <h2><span data-l="es" lang="es">Vete</span><span data-l="en" lang="en">Walk away</span></h2>
+    <p class="stand"><span data-l="es" lang="es">El trabajo sigue cuando te levantas. Solo te buscará en el teléfono lo que te necesite.</span><span data-l="en" lang="en">The work goes on when you get up. Whatever needs you will find you on your phone, and nothing else will.</span></p>
+  </header>
+  <div class="col">
+    <aside class="how">
+      <h3><span data-l="es" lang="es">En la ventana</span><span data-l="en" lang="en">In the window</span></h3>
+      <ol>
+        <li><span data-l="es" lang="es">Clic derecho en <span class="ui">Phone</span>, en la bandeja: <span class="ui">Pair a Phone…</span>, y escanea el código.</span><span data-l="en" lang="en">Right-click <span class="ui">Phone</span> in the tray: <span class="ui">Pair a Phone…</span>, and scan the code.</span></li>
+        <li><span data-l="es" lang="es">Clic derecho en el líder, <span class="ui">Away</span>.</span><span data-l="en" lang="en">Right-click the lead, <span class="ui">Away</span>.</span></li>
+        <li><span data-l="es" lang="es">El sol de la bandeja: el Mac despierto mientras trabajan.</span><span data-l="en" lang="en">The sun in the tray: the Mac stays awake while they work.</span></li>
+      </ol>
+    </aside>
+    <p data-l="es" lang="es">Clic derecho en <span class="ui">Phone</span>, en la bandeja de la barra de título, y <span class="ui">Pair a Phone…</span>: un código QR de un solo uso. Lo escaneas con Tailscale conectado en el teléfono, te emparejas con la huella y añades jmux a la pantalla de inicio. Desde entonces el Mac sirve la app del teléfono por tu red de Tailscale y solo por ella, y el teléfono demuestra quién es con una passkey en cada conexión. Tus terminales y tus conversaciones no pasan por el servidor de nadie; los avisos viajan cifrados por el servicio push del navegador.</p>
+    <p data-l="en" lang="en">Right-click <span class="ui">Phone</span> in the title bar's tray, then <span class="ui">Pair a Phone…</span>: a single-use QR code. You scan it with Tailscale connected on the phone, pair with your fingerprint and add jmux to the home screen. From then on the Mac serves the phone's app over your Tailscale network and nothing else, and the phone proves who it is with a passkey on every connection. Your terminals and conversations go through nobody's server; notifications travel encrypted through the browser's push service.</p>
+    <p data-l="es" lang="es"><span class="ui">Needs you</span> es la primera pestaña. Un Claude que pide permiso para ejecutar algo aparece como una tarjeta con la orden y la carpeta: <span class="ui">Allow</span>, <span class="ui">Deny</span> o <span class="ui">Deny and say why…</span>. Mientras <span class="ui">Phone</span> está encendido y hay un teléfono emparejado, esa misma tarjeta sale también en el Mac, junto a la fila. La contestas donde estés, y si no la contesta nadie, la pregunta vuelve a la terminal sin que se haya decidido nada.</p>
+    <p data-l="en" lang="en"><span class="ui">Needs you</span> is the first tab. A Claude asking permission to run something shows up as a card with the command and its folder: <span class="ui">Allow</span>, <span class="ui">Deny</span> or <span class="ui">Deny and say why…</span>. While <span class="ui">Phone</span> is on and a phone is paired, the same card shows on the Mac too, beside the row. You answer it wherever you are, and if nobody answers, the question goes back to the terminal with nothing decided.</p>
+    <figure class="fig phones wide">
+      <div class="row">
+        <img class="for-paper" src="shots/phone-needs-light.webp" width="448" height="997" loading="lazy" decoding="async" data-alt-es="Teléfono: la pestaña Needs you con tres tarjetas de permiso, cada una con la orden, Deny y Allow." data-alt-en="Phone: the Needs you tab with three permission cards, each with its command, Deny and Allow." alt="Teléfono: la pestaña Needs you con tres tarjetas de permiso, cada una con la orden, Deny y Allow.">
+        <img class="for-night" src="shots/phone-needs-dark.webp" width="448" height="997" loading="lazy" decoding="async" data-alt-es="Teléfono: la pestaña Needs you con tres tarjetas de permiso, cada una con la orden, Deny y Allow." data-alt-en="Phone: the Needs you tab with three permission cards, each with its command, Deny and Allow." alt="Teléfono: la pestaña Needs you con tres tarjetas de permiso, cada una con la orden, Deny y Allow.">
+        <img class="for-paper" src="shots/phone-lead-light.webp" width="448" height="997" loading="lazy" decoding="async" data-alt-es="Teléfono: la conversación de un líder, con una tarjeta de permiso dentro y el compositor «Tell jmux 10…» abajo." data-alt-en="Phone: a lead's conversation, with a permission card inside it and the “Tell jmux 10…” composer at the bottom." alt="Teléfono: la conversación de un líder, con una tarjeta de permiso dentro y el compositor «Tell jmux 10…» abajo.">
+        <img class="for-night" src="shots/phone-lead-dark.webp" width="448" height="997" loading="lazy" decoding="async" data-alt-es="Teléfono: la conversación de un líder, con una tarjeta de permiso dentro y el compositor «Tell jmux 10…» abajo." data-alt-en="Phone: a lead's conversation, with a permission card inside it and the “Tell jmux 10…” composer at the bottom." alt="Teléfono: la conversación de un líder, con una tarjeta de permiso dentro y el compositor «Tell jmux 10…» abajo.">
+        <img class="for-paper" src="shots/phone-away-light.webp" width="448" height="997" loading="lazy" decoding="async" data-alt-es="Teléfono: la hoja «Away for jmux 10», que explica qué hará el líder mientras no estás, con Cancel y Turn Away on." data-alt-en="Phone: the “Away for jmux 10” sheet, explaining what the lead will do while you are gone, with Cancel and Turn Away on." alt="Teléfono: la hoja «Away for jmux 10», que explica qué hará el líder mientras no estás, con Cancel y Turn Away on.">
+        <img class="for-night" src="shots/phone-away-dark.webp" width="448" height="997" loading="lazy" decoding="async" data-alt-es="Teléfono: la hoja «Away for jmux 10», que explica qué hará el líder mientras no estás, con Cancel y Turn Away on." data-alt-en="Phone: the “Away for jmux 10” sheet, explaining what the lead will do while you are gone, with Cancel and Turn Away on." alt="Teléfono: la hoja «Away for jmux 10», que explica qué hará el líder mientras no estás, con Cancel y Turn Away on.">
+      </div>
+      <figcaption><span data-l="es" lang="es">Tres pantallas del teléfono. Lo que te necesita, con <span class="ui">Allow</span> a mano. La conversación de un líder, con su pregunta dentro y el compositor para contestarle. Y la hoja de Away, que dice qué hará el líder mientras no estás antes de encenderlo.</span><span data-l="en" lang="en">Three phone screens. What needs you, with <span class="ui">Allow</span> to hand. A lead's conversation, with its question inside and the composer to answer it. And the Away sheet, which says what the lead will do while you are gone before you turn it on.</span></figcaption>
+    </figure>
+    <aside class="note"><span data-l="es" lang="es">Es una app web que se instala en la pantalla de inicio. Se ha probado en Chrome sobre Android; en iPhone no se ha comprobado todavía.</span><span data-l="en" lang="en">It is a web app you install on the home screen. It has been tested in Chrome on Android; on iPhone it has not been checked yet.</span></aside>
+    <p data-l="es" lang="es">Abres una sesión y lees su conversación, ves a sus hijos o miras su terminal en vivo. Le escribes al líder desde abajo, <span class="ui">Tell payments-api 1…</span>, y le llega como un mensaje tuyo. <span data-needs="B-439">Si lo que quieres enseñarle es una pizarra o un error en otra pantalla, le mandas la foto, y el agente la recibe en el Mac.</span></p>
+    <p data-l="en" lang="en">You open a session and read its conversation, see its children or watch its terminal live. You write to the lead from the bottom, <span class="ui">Tell payments-api 1…</span>, and it gets it as a message from you. <span data-needs="B-439">If what you want to show it is a whiteboard or an error on another screen, you send the photo, and the agent gets it on the Mac.</span></p>
+    <p data-l="es" lang="es"><span class="ui">Away</span> es para cuando te vas de verdad. Lo enciendes en la fila del líder, en <span class="ui">Edit Workflow…</span> o desde el teléfono, y aparece una luna en la fila. Mientras dura, el líder decide solo y escribe por qué, y contesta las peticiones de permiso de sus hijos de Claude dentro de los límites que pone jmux: leer y comprobar, sí; hacer push, desplegar o escribir fuera de la carpeta del hijo, no. Tus barreras te siguen preguntando a ti. No aterriza nada en main salvo que se lo permitas con <span class="ui">May Land on Main</span>. Cuando vuelves y escribes en su terminal, Away se acaba.</p>
+    <p data-l="en" lang="en"><span class="ui">Away</span> is for when you really leave. You turn it on from the lead's row, from <span class="ui">Edit Workflow…</span> or from the phone, and a moon appears on the row. While it lasts, the lead decides alone and writes why, and answers its Claude children's permission prompts within limits jmux sets: reading and checking, yes; pushing, deploying or writing outside the child's folder, no. Your guardrails still ask you. Nothing lands on main unless you allow it with <span class="ui">May Land on Main</span>. When you come back and type in its terminal, Away ends.</p>
+    <aside class="wont">
+      <h3><span data-l="es" lang="es">No hace</span><span data-l="en" lang="en">It won't</span></h3>
+      <p><span data-l="es" lang="es">Contestar por ti. Ni siquiera con Away: entonces es tu líder quien contesta a sus hijos, con límites. Lo que pregunta una sesión tuya solo lo contestas tú.</span><span data-l="en" lang="en">Answer for you. Not even with Away: then it is your lead that answers its children, within limits. What one of your own sessions asks, only you answer.</span></p>
+    </aside>
+    <p data-l="es" lang="es">El sol de la bandeja mantiene el Mac despierto mientras trabajan los agentes, y deja de hacerlo cuando paran. Con la tapa cerrada, el Mac se duerme igual.</p>
+    <p data-l="en" lang="en">The sun in the tray keeps the Mac awake while the agents work, and lets go when they stop. With the lid closed, the Mac sleeps all the same.</p>
+  </div>
+</article>
+
+<!-- ─────────────────────────────── 18:40 ─────────────────────────────── -->
+<article class="ch" id="c7" data-time="18:40">
+  <header class="ch-head">
+    <span class="time">18:40</span>
+    <h2><span data-l="es" lang="es">Se acaba el contexto</span><span data-l="en" lang="en">The context runs out</span></h2>
+    <p class="stand"><span data-l="es" lang="es">Un líder no dura para siempre. Su relevo sabe dónde lo dejó.</span><span data-l="en" lang="en">A lead does not last for ever. Its successor knows where it left off.</span></p>
+  </header>
+  <div class="col">
+    <aside class="how">
+      <h3><span data-l="es" lang="es">En la ventana</span><span data-l="en" lang="en">In the window</span></h3>
+      <ol>
+        <li><span data-l="es" lang="es">Clic derecho en el líder, <span class="ui">Relay ▸</span>.</span><span data-l="en" lang="en">Right-click the lead, <span class="ui">Relay ▸</span>.</span></li>
+        <li><span data-l="es" lang="es"><span class="ui">Now</span>, <span class="ui">As Soon As Possible</span> o <span class="ui">Later</span>.</span><span data-l="en" lang="en"><span class="ui">Now</span>, <span class="ui">As Soon As Possible</span> or <span class="ui">Later</span>.</span></li>
+        <li><span data-l="es" lang="es">Lo aparcado: menú <span class="ui">+</span> del proyecto, <span class="ui">Parked ▸</span>.</span><span data-l="en" lang="en">What is parked: the project's <span class="ui">+</span> menu, <span class="ui">Parked ▸</span>.</span></li>
+      </ol>
+    </aside>
+    <p data-l="es" lang="es">Cuando el líder llega al umbral de su perfil (el 35&nbsp;% del contexto, en Team), jmux le pide una nota de traspaso: qué hay hecho, qué viene ahora, qué peligros hay. Con esa nota arranca un sucesor con el mismo modelo, el mismo permiso, el mismo perfil y la misma copia de trabajo, que adopta a sus hijos y empieza leyéndola. Los mensajes para el viejo le llegan al nuevo. La última línea del viejo dice a quién pasó el trabajo.</p>
+    <p data-l="en" lang="en">When the lead reaches its profile's threshold (35&nbsp;% of the context, in Team), jmux asks it for a handover note: what is done, what comes next, what the dangers are. With that note it starts a successor on the same model, the same permission, the same profile and the same checkout, which adopts its children and starts by reading it. Messages for the old one reach the new one. The old one's last line says who it handed the work to.</p>
+    <p class="pull"><span data-l="es" lang="es">Es una pulsación, y no aparece nada.</span><span data-l="en" lang="en">It is one press, and nothing pops up.</span></p>
+    <p data-l="es" lang="es">También puedes hacerlo tú. <span class="ui">Relay ▸</span>, en el clic derecho del líder, te dice cuánto contexto lleva, te deja cambiar de perfil, de modelo o de esfuerzo para el relevo, y hacerlo ahora, en cuanto se pueda o más tarde. <span class="ui">Later</span> lo aparca: la sesión queda atenuada con un marcador, y en el menú <span class="ui">+</span> del proyecto, <span class="ui">Parked ▸</span>, lees su nota, le cambias el modelo y lo arrancas mañana.</p>
+    <p data-l="en" lang="en">You can do it yourself too. <span class="ui">Relay ▸</span>, on the lead's right-click, tells you how much context it has used, lets you change the profile, model or effort for the successor, and relay now, as soon as possible or later. <span class="ui">Later</span> parks it: the session dims with a bookmark, and in the project's <span class="ui">+</span> menu, <span class="ui">Parked ▸</span>, you read its note, change its model and start it tomorrow.</p>
+    <aside class="wont">
+      <h3><span data-l="es" lang="es">No hace</span><span data-l="en" lang="en">It won't</span></h3>
+      <p><span data-l="es" lang="es">Reintentar a escondidas. Si un relevo automático falla, no vuelve a probar solo: te lo dice la campana, con <span class="ui">Relay Now</span>.</span><span data-l="en" lang="en">Retry behind your back. If an automatic relay fails, it does not try again on its own: the bell tells you, with <span class="ui">Relay Now</span>.</span></p>
+    </aside>
+    <figure class="fig bleed" id="fig-relay">
+      <div class="plate"><a class="zoom" href="shots/relay-note.webp"><img src="shots/relay-note.webp" srcset="shots/relay-note-960.webp 960w, shots/relay-note.webp 1600w" sizes="(min-width: 1120px) 72rem, 100vw" width="1600" height="210" loading="lazy" decoding="async"
+        data-alt-es="La parte de arriba de la ventana tras el relevo. En la barra lateral, payments-api 1 atenuado con 90k y payments-api 2 con 39k. A la izquierda, el líder viejo: «I've handed off to session 18; my note is saved at …/note.md.» A la derecha, payments-api 2 con el final de su primer mensaje: el flujo de trabajo que sigue, después de la nota." data-alt-en="The top of the window after the relay. In the sidebar, payments-api 1 dimmed at 90k and payments-api 2 at 39k. On the left, the old lead: “I've handed off to session 18; my note is saved at …/note.md.” On the right, payments-api 2 with the end of its first message: the workflow it follows, after the note." alt="La parte de arriba de la ventana tras el relevo. En la barra lateral, payments-api 1 atenuado con 90k y payments-api 2 con 39k. A la izquierda, el líder viejo: «I've handed off to session 18; my note is saved at …/note.md.» A la derecha, payments-api 2 con el final de su primer mensaje: el flujo de trabajo que sigue, después de la nota."></a>
+        <span class="pin" style="--x:17.8%;--y:35%">1</span><span class="pin" style="--x:17.8%;--y:76%">2</span><span class="pin" style="--x:48.5%;--y:77%">3</span><span class="pin" style="--x:85.5%;--y:38%">4</span></div>
+      <div class="plate right"><a class="zoom" href="shots/relay-last.webp"><img src="shots/relay-last.webp" srcset="shots/relay-last-960.webp 790w, shots/relay-last.webp 1317w" sizes="(min-width: 1120px) 59rem, 82vw" width="1317" height="295" loading="lazy" decoding="async"
+        data-alt-es="La parte de abajo de los dos paneles. A la izquierda, la última línea del líder viejo: «This session was handed over to payments-api 2 (18).» A la derecha, payments-api 2: «I'm taking over from payments-api 1 (5).», sus siguientes pasos (decidir sobre un commit, retomar B-03 con lo que pide B-06, hacerlo como Team y preguntarte antes de aterrizar) y «Shall I start?»." data-alt-en="The bottom of the two panes. On the left, the old lead's last line: “This session was handed over to payments-api 2 (18).” On the right, payments-api 2: “I'm taking over from payments-api 1 (5).”, its next steps (settle a commit, pick up B-03 with what B-06 asks of it, run it as a Team and ask you before landing) and “Shall I start?”." alt="La parte de abajo de los dos paneles. A la izquierda, la última línea del líder viejo: «This session was handed over to payments-api 2 (18).» A la derecha, payments-api 2: «I'm taking over from payments-api 1 (5).», sus siguientes pasos (decidir sobre un commit, retomar B-03 con lo que pide B-06, hacerlo como Team y preguntarte antes de aterrizar) y «Shall I start?»."></a>
+        <span class="pin" style="--x:40.4%;--y:91%">5</span><span class="pin" style="--x:82%;--y:19%">6</span></div>
+      <figcaption><span data-l="es" lang="es">Un relevo pedido a mano, arriba y abajo de la ventana. <span class="k">1</span>El líder viejo, atenuado, con 90 000 tokens de contexto, y <span class="k">2</span>su sucesor, que empieza con 39 000. <span class="k">3</span>El viejo dice dónde dejó su nota. <span class="k">4</span>El final del primer mensaje del nuevo: después de la nota del viejo, el flujo de trabajo que sigue, que manda si los dos no coinciden. <span class="k">5</span>La última línea del viejo. <span class="k">6</span>El nuevo, tras leerlo todo, dice que toma el relevo y por dónde sigue, paso a paso, y no empieza hasta que digas que sí.</span><span data-l="en" lang="en">A relay asked for by hand, the top and the bottom of the window. <span class="k">1</span>The old lead, dimmed, at 90,000 tokens of context, and <span class="k">2</span>its successor, starting at 39,000. <span class="k">3</span>The old one says where it left its note. <span class="k">4</span>The end of the new one's first message: after the old one's note, the workflow it follows, which wins where the two disagree. <span class="k">5</span>The old one's last line. <span class="k">6</span>The new one, having read it all, says it is taking over and where it goes from here, step by step, and does not start until you say yes.</span></figcaption>
+    </figure>
+  </div>
+</article>
+
+<!-- ─────────────────────────────── 21:30 ─────────────────────────────── -->
+<article class="ch" id="c8" data-time="21:30">
+  <header class="ch-head">
+    <span class="time">21:30</span>
+    <h2><span data-l="es" lang="es">Lo del martes</span><span data-l="en" lang="en">That thing from Tuesday</span></h2>
+    <p class="stand"><span data-l="es" lang="es">Sabes que un agente te lo explicó. No sabes cuál, ni en qué proyecto.</span><span data-l="en" lang="en">You know an agent explained it to you. You do not know which one, or in what project.</span></p>
+  </header>
+  <div class="col">
+    <aside class="how">
+      <h3><span data-l="es" lang="es">En la ventana</span><span data-l="en" lang="en">In the window</span></h3>
+      <ol>
+        <li><span data-l="es" lang="es"><kbd>⌘⇧F</kbd> y escribe.</span><span data-l="en" lang="en"><kbd>⌘⇧F</kbd> and type.</span></li>
+        <li><span data-l="es" lang="es"><kbd>⏎</kbd> la abre, <kbd>⌘⏎</kbd> va a la sesión, <kbd>⇧⌘⏎</kbd> la retoma aquí.</span><span data-l="en" lang="en"><kbd>⏎</kbd> opens it, <kbd>⌘⏎</kbd> goes to the session, <kbd>⇧⌘⏎</kbd> resumes it here.</span></li>
+        <li><span data-l="es" lang="es"><span class="ui">Settings ▸ Search</span> para lo que queda fuera.</span><span data-l="en" lang="en"><span class="ui">Settings ▸ Search</span> for what stays out.</span></li>
+      </ol>
+    </aside>
+    <p data-l="es" lang="es"><kbd>⌘⇧F</kbd> busca en todas las conversaciones de Claude y de Codex de este Mac: las empezadas en jmux y las que no, las vivas y las terminadas. <span class="ui">Words</span> busca palabras; <span class="ui">Text</span>, el texto exacto. Los resultados vienen agrupados por conversación, con cada mensaje que coincide, y a la derecha la conversación para leerla sin salir del panel.</p>
+    <p data-l="en" lang="en"><kbd>⌘⇧F</kbd> searches every Claude and Codex conversation on this Mac: the ones started in jmux and the ones that were not, the live ones and the ended ones. <span class="ui">Words</span> looks for words; <span class="ui">Text</span>, for the exact text. Results come grouped by conversation, with every message that matches, and the conversation on the right to read without leaving the panel.</p>
+    <p data-l="es" lang="es">Si la conversación sigue viva, <kbd>⌘⏎</kbd> te lleva a su sesión. Si terminó hace días, <kbd>⇧⌘⏎</kbd> la retoma aquí, en una sesión nueva, con su agente. Los agentes también buscan, y en <span class="ui">Settings ▸ Search</span> decides si solo en su proyecto o en todas partes, y qué carpetas quedan fuera de la búsqueda.</p>
+    <p data-l="en" lang="en">If the conversation is still alive, <kbd>⌘⏎</kbd> takes you to its session. If it ended days ago, <kbd>⇧⌘⏎</kbd> resumes it here, in a new session, with its agent. Agents search too, and in <span class="ui">Settings ▸ Search</span> you decide whether only in their project or everywhere, and which folders stay out of search.</p>
+    <aside class="wont">
+      <h3><span data-l="es" lang="es">No hace</span><span data-l="en" lang="en">It won't</span></h3>
+      <p><span data-l="es" lang="es">Mandar tus conversaciones a ningún sitio. El índice vive en tu Mac, junto a lo demás que guarda jmux, y se puede tirar y rehacer.</span><span data-l="en" lang="en">Send your conversations anywhere. The index lives on your Mac, beside everything else jmux keeps, and can be thrown away and rebuilt.</span></p>
+    </aside>
+    <figure class="fig phones two" id="fig-search">
+      <div class="row">
+        <img class="for-paper" src="shots/phone-search-light.webp" width="448" height="997" loading="lazy" decoding="async" data-alt-es="Teléfono: buscar «tailscale» en todas las conversaciones del Mac, con los mensajes que coinciden, de Codex y de Claude." data-alt-en="Phone: searching “tailscale” across every conversation on the Mac, with the matching messages, from Codex and from Claude." alt="Teléfono: buscar «tailscale» en todas las conversaciones del Mac, con los mensajes que coinciden, de Codex y de Claude.">
+        <img class="for-night" src="shots/phone-search-dark.webp" width="448" height="997" loading="lazy" decoding="async" data-alt-es="Teléfono: buscar «tailscale» en todas las conversaciones del Mac, con los mensajes que coinciden, de Codex y de Claude." data-alt-en="Phone: searching “tailscale” across every conversation on the Mac, with the matching messages, from Codex and from Claude." alt="Teléfono: buscar «tailscale» en todas las conversaciones del Mac, con los mensajes que coinciden, de Codex y de Claude.">
+        <img class="for-paper" src="shots/phone-conversation-light.webp" width="448" height="997" loading="lazy" decoding="async" data-alt-es="Teléfono: una conversación de Codex de hace días, abierta desde la búsqueda, con el mensaje que coincidía resaltado." data-alt-en="Phone: a Codex conversation from days ago, opened from search, with the matching message outlined." alt="Teléfono: una conversación de Codex de hace días, abierta desde la búsqueda, con el mensaje que coincidía resaltado.">
+        <img class="for-night" src="shots/phone-conversation-dark.webp" width="448" height="997" loading="lazy" decoding="async" data-alt-es="Teléfono: una conversación de Codex de hace días, abierta desde la búsqueda, con el mensaje que coincidía resaltado." data-alt-en="Phone: a Codex conversation from days ago, opened from search, with the matching message outlined." alt="Teléfono: una conversación de Codex de hace días, abierta desde la búsqueda, con el mensaje que coincidía resaltado.">
+      </div>
+      <figcaption><span data-l="es" lang="es">La misma búsqueda, desde el teléfono (<span class="ui">More ▸ Search</span>): una palabra, todas las conversaciones del Mac, de Claude y de Codex. Al abrir una, el mensaje que coincidía queda marcado.</span><span data-l="en" lang="en">The same search, from the phone (<span class="ui">More ▸ Search</span>): one word, every conversation on the Mac, Claude's and Codex's. Open one and the matching message is marked.</span></figcaption>
+    </figure>
+  </div>
+</article>
+
+<!-- ─────────────────────────────── 23:50 ─────────────────────────────── -->
+<article class="ch" id="c9" data-time="23:50">
+  <header class="ch-head">
+    <span class="time">23:50</span>
+    <h2><span data-l="es" lang="es">Aterriza</span><span data-l="en" lang="en">It lands</span></h2>
+    <p class="stand"><span data-l="es" lang="es">Comprobado sobre el último commit de la rama, llevado a main e instalado. Con todas las sesiones abiertas.</span><span data-l="en" lang="en">Checked on the branch's last commit, brought onto main and installed. With every session still open.</span></p>
+  </header>
+  <div class="col">
+    <aside class="how">
+      <h3><span data-l="es" lang="es">En la ventana</span><span data-l="en" lang="en">In the window</span></h3>
+      <ol>
+        <li><span data-l="es" lang="es">Tarjeta <span class="ui">Landing</span>: la orden y su comprobación.</span><span data-l="en" lang="en">The <span class="ui">Landing</span> card: the command and its check.</span></li>
+        <li><span data-l="es" lang="es"><span class="ui">Your lead, on its own</span>: <span class="ui">Landing and install</span>.</span><span data-l="en" lang="en"><span class="ui">Your lead, on its own</span>: <span class="ui">Landing and install</span>.</span></li>
+        <li><span data-l="es" lang="es">El chip de versión, cuando cambia de color.</span><span data-l="en" lang="en">The version chip, when it changes colour.</span></li>
+      </ol>
+    </aside>
+    <p data-l="es" lang="es">La tarjeta <span class="ui">Landing</span> dice qué pasa cuando un cambio llega a la rama principal: qué orden lo instala y qué comprobación tiene que pasar antes. Si le has dejado a tu líder aterrizar e instalar, lo hace solo. Si el perfil dice que te pregunte antes de aterrizar, te pregunta.</p>
+    <p data-l="en" lang="en">The <span class="ui">Landing</span> card says what happens when a change reaches the main branch: which command installs it and which check must pass first. If you left landing and installing to your lead, it does it alone. If the profile says to ask you before landing, it asks.</p>
+    <p data-l="es" lang="es">El líder pide el aterrizaje y jmux lo ejecuta, sin fiarse de su palabra. Se niega si la copia no está limpia o si la rama no es un avance rápido (fast-forward) de main. Pasa la comprobación entera sobre el último commit exacto de la rama, avanza main, instala y le cuenta el resultado al líder, con la ruta de su registro. Si la comprobación falla por un test inestable, al repetirla empieza por el paso que falló: los que pasaron sobre ese mismo commit se guardan.</p>
+    <p data-l="en" lang="en">The lead asks for the landing and jmux runs it, without taking its word for anything. It refuses if the checkout is not clean or if the branch is not a fast-forward of main. It runs the whole check on the branch's exact last commit, moves main forward, installs, and tells the lead the result, with the path to its log. If the check fails on a flaky test, running it again starts from the step that failed: the ones that passed on that same commit are kept.</p>
+    <aside class="wont">
+      <h3><span data-l="es" lang="es">No hace</span><span data-l="en" lang="en">It won't</span></h3>
+      <p><span data-l="es" lang="es">Dejar que un hijo instale. Un constructor, un revisor o un ayudante nunca aterriza ni instala: «your parent lands the work». Y el líder, solo lo que tú le has dado.</span><span data-l="en" lang="en">Let a child install. A builder, a reviewer or a helper never lands or installs: “your parent lands the work”. And the lead does only what you gave it.</span></p>
+    </aside>
+    <figure class="fig bleed" id="fig-land">
+      <div class="plate"><a class="zoom" href="shots/land.webp"><img src="shots/land.webp" srcset="shots/land-960.webp 960w, shots/land.webp 1600w" sizes="(min-width: 1120px) 72rem, 100vw" width="1600" height="1000" loading="lazy" decoding="async"
+        data-alt-es="El informe del líder tras aterrizar: qué cambió en B-01 y B-02, qué queda para más tarde en la entrada B-06, y que B-01 y B-02 pasaron a DONE.md. A la derecha, el tablero con B-06 marcada como nueva y nada en curso." data-alt-en="The lead's report after landing: what changed in B-01 and B-02, what is left for later in entry B-06, and that B-01 and B-02 moved to DONE.md. On the right, the board with B-06 marked new and nothing in progress." alt="El informe del líder tras aterrizar: qué cambió en B-01 y B-02, qué queda para más tarde en la entrada B-06, y que B-01 y B-02 pasaron a DONE.md. A la derecha, el tablero con B-06 marcada como nueva y nada en curso."></a>
+        <span class="pin" style="--x:30.2%;--y:96.5%">1</span><span class="pin" style="--x:33%;--y:18.2%">2</span><span class="pin" style="--x:46%;--y:61.2%">3</span><span class="pin" style="--x:89%;--y:16.9%">4</span><span class="pin" style="--x:72%;--y:20.2%">5</span></div>
+      <figcaption><span data-l="es" lang="es">Después de aterrizar. <span class="k">1</span>La copia del líder ya está en <code>main</code>. <span class="k">2</span>Qué cambió, contado para quien no estaba. <span class="k">3</span>Lo que la revisión dejó para más tarde, apuntado por el líder en una entrada nueva, B-06, que <span class="k">4</span>el tablero marca como nueva. <span class="k">5</span>Nada queda en curso.</span><span data-l="en" lang="en">After landing. <span class="k">1</span>The lead's checkout is on <code>main</code> now. <span class="k">2</span>What changed, written for whoever wasn't there. <span class="k">3</span>What the review left for later, written down by the lead as a new entry, B-06, which <span class="k">4</span>the board marks as new. <span class="k">5</span>Nothing is left in progress.</span></figcaption>
+    </figure>
+    <p data-l="es" lang="es">Cuando lo que se instala es el propio jmux, tampoco se cierra nada. El demonio nuevo recoge las terminales vivas, el chip de versión de la barra de título cambia de color, y cuando haces clic la ventana se reabre sobre la versión nueva. Y si esa versión se publica, tus otros Macs se ponen al día solos la próxima vez que abren jmux.</p>
+    <p data-l="en" lang="en">When what gets installed is jmux itself, nothing closes either. The new daemon takes the live terminals over, the version chip in the title bar changes colour, and when you click it the window reopens onto the new version. And if that version is published, your other Macs catch up on their own the next time they open jmux.</p>
+    <p data-l="es" lang="es">A medianoche, el tablero tiene dos entradas menos y una nueva, la que el líder apuntó para más tarde. Cierras la tapa. Mañana todo estará donde lo dejaste.</p>
+    <p data-l="en" lang="en">At midnight the board has two entries fewer and one new one, the thing the lead wrote down for later. You close the lid. Tomorrow everything will be where you left it.</p>
+  </div>
+</article>
+
+<!-- ─────────────────────────────── won't ─────────────────────────────── -->
+<article class="ch" id="nots" data-time="✕">
+  <header class="ch-head">
+    <span class="time">✕</span>
+    <h2><span data-l="es" lang="es">Lo que jmux no hará</span><span data-l="en" lang="en">What jmux won't do</span></h2>
+    <p class="stand"><span data-l="es" lang="es">A un buen ayudante se le nota en lo que no hace. Esta es la lista, y cada punto se cumple hoy.</span><span data-l="en" lang="en">You can tell a good assistant by what it does not do. Here is the list, and every point holds today.</span></p>
+  </header>
+  <div class="col">
+    <ol class="nots">
+      <li><span data-l="es" lang="es"><b>Contestar por ti.</b> Lo que pregunta una sesión tuya lo contestas tú, en la terminal, en una tarjeta o en el teléfono. Con Away, tu líder contesta a sus hijos de Claude, y nunca un push, un despliegue o lo que tus barreras te reservan.</span><span data-l="en" lang="en"><b>Answer for you.</b> What one of your sessions asks, you answer, in the terminal, on a card or on the phone. With Away, your lead answers its Claude children, and never a push, a deploy, or anything your guardrails keep for you.</span></li>
+      <li><span data-l="es" lang="es"><b>Ponerse entre tú y tu agente.</b> No hay capa de chat. Cada agente corre en su propia CLI, entera, en una terminal de verdad: lo que sabes hacer en Claude Code o en Codex lo sigues haciendo igual.</span><span data-l="en" lang="en"><b>Stand between you and your agent.</b> There is no chat layer. Each agent runs in its own CLI, whole, in a real terminal: what you know how to do in Claude Code or Codex, you keep doing the same way.</span></li>
+      <li><span data-l="es" lang="es"><b>Llamarte desde fuera de la ventana.</b> Ni globo en el Dock, ni notificación del sistema, ni un sonido suyo: el pitido de un programa en una terminal suena como en cualquier terminal. El teléfono solo te avisa de los tipos de cosas que tú eliges.</span><span data-l="en" lang="en"><b>Call you from outside the window.</b> No Dock badge, no system notification, no sound of its own: a program's beep in a terminal sounds as in any terminal. The phone only alerts you to the kinds of things you choose.</span></li>
+      <li><span data-l="es" lang="es"><b>Llevar un flujo propio.</b> No guarda un plan ni espera veredictos. Arranca sesiones, guarda el techo de permisos, entrega los mensajes y releva. El resto lo dice el líder en voz alta.</span><span data-l="en" lang="en"><b>Run a workflow of its own.</b> It keeps no plan and waits on no verdict. It starts sessions, holds the permission ceiling, delivers the messages and relays. The rest, the lead says out loud.</span></li>
+      <li><span data-l="es" lang="es"><b>Renombrar nada.</b> El nombre de una sesión es tuyo. Un <code>/rename</code> dentro del agente cuenta como tuyo; el título que se invente el agente, no.</span><span data-l="en" lang="en"><b>Rename anything.</b> A session's name is yours. A <code>/rename</code> inside the agent counts as yours; a title the agent makes up does not.</span></li>
+      <li><span data-l="es" lang="es"><b>Escribir en tu repositorio por su cuenta.</b> Lo que escribe ahí lo escribe porque tú o un agente se lo habéis pedido: una regla del proyecto que guardas (<code>.jmux/project.toml</code>), un <span class="ui">Once</span> o un <span class="ui">Allow for this project</span> (<code>.claude/settings.local.json</code>, fuera de git), el backlog desde el tablero o la orden de un agente, el trabajo que deja un hijo al terminar (en su rama), un aterrizaje en main. Los worktrees de los hijos viven fuera, en <code>~/.jmux/worktrees</code>.</span><span data-l="en" lang="en"><b>Write in your repository on its own.</b> What it writes there, it writes because you or an agent asked: a project rule you save (<code>.jmux/project.toml</code>), a <span class="ui">Once</span> or an <span class="ui">Allow for this project</span> (<code>.claude/settings.local.json</code>, kept out of git), the backlog from the board or an agent's command, the work a child leaves when it ends (on its branch), a landing on main. Children's worktrees live outside, in <code>~/.jmux/worktrees</code>.</span></li>
+      <li><span data-l="es" lang="es"><b>Instalarse en tus agentes sin preguntar.</b> Un aviso te ofrece los hooks: <span class="ui">Install</span>, <span class="ui">Not Now</span> o <span class="ui">Don't Ask Again</span>. Si dices que sí, añade sus entradas junto a las tuyas, y quitarlo quita exactamente las suyas.</span><span data-l="en" lang="en"><b>Install itself into your agents without asking.</b> A banner offers the hooks: <span class="ui">Install</span>, <span class="ui">Not Now</span> or <span class="ui">Don't Ask Again</span>. Say yes and it adds its entries beside yours, and removing it removes exactly its own.</span></li>
+      <li><span data-l="es" lang="es"><b>Fingir que conoce a todos los agentes.</b> Conoce dos, Claude Code y Codex, cada uno por su nombre y por lo que sabe hacer. No una tabla genérica de veinte.</span><span data-l="en" lang="en"><b>Pretend it knows every agent.</b> It knows two, Claude Code and Codex, each by name and by what it can do. Not a generic table of twenty.</span></li>
+    </ol>
+  </div>
+</article>
+
 </main>
 
-<footer class="foot">
-  <div class="wrap">
-    <span class="mono">jmux</span>
-    <span data-i-html="foot.made"></span>
-    <span style="margin-left:auto" data-i-html="foot.credits"></span>
+<!-- ─────────────────────────────── numbers ─────────────────────────────── -->
+<section class="numbers" id="numbers" aria-labelledby="numbers-h">
+  <div class="in">
+    <h2 id="numbers-h"><span data-l="es" lang="es">Cifras</span><span data-l="en" lang="en">Numbers</span></h2>
+    <p class="src"><span data-l="es" lang="es">Medidas con <code>make perf</code> sobre la app real en un Mac con Apple Silicon, en agosto de 2026 (versiones 0.1.166 a 0.1.182). No se han vuelto a medir desde entonces; cuando se midan, cambiarán aquí.</span><span data-l="en" lang="en">Measured with <code>make perf</code> on the real app on an Apple Silicon Mac, in August 2026 (versions 0.1.166 to 0.1.182). They have not been measured again since; when they are, they will change here.</span></p>
+    <dl class="grid-n">
+      <div><dt><span data-l="es" lang="es">1,54</span><span data-l="en" lang="en">1.54</span><small>ms</small></dt><dd><span data-l="es" lang="es">añadidos de la tecla al glifo sobre un terminal desnudo (mediana; la pulsación entera más lenta de 1.200 tardó 12,6 ms).</span><span data-l="en" lang="en">added from key to glyph over a bare terminal (median; the slowest whole keystroke of 1,200 took 12.6 ms).</span></dd></div>
+      <div><dt>0<small>/ <span data-l="es" lang="es">20.004</span><span data-l="en" lang="en">20,004</span></small></dt><dd><span data-l="es" lang="es">fotogramas tarde a 60 fps desplazando 10.000 líneas. El peor tardó 5,97 ms.</span><span data-l="en" lang="en">frames late at 60 fps scrolling 10,000 lines. The worst took 5.97 ms.</span></dd></div>
+      <div><dt>175<small>ms</small></dt><dd><span data-l="es" lang="es">de abrir en frío al primer fotograma.</span><span data-l="en" lang="en">from a cold open to the first frame.</span></dd></div>
+      <div><dt>204<small>ms</small></dt><dd><span data-l="es" lang="es">al volver a abrir la ventana, desde su primer fotograma hasta que diez paneles llenos tienen su sesión.</span><span data-l="en" lang="en">on reopening the window, from its first frame until ten full panes have their sessions.</span></dd></div>
+      <div><dt><span data-l="es" lang="es">0,002</span><span data-l="en" lang="en">0.002</span><small>%</small></dt><dd><span data-l="es" lang="es">de CPU del demonio en reposo, con diez sesiones y ninguna ventana.</span><span data-l="en" lang="en">daemon CPU at rest, with ten sessions and no window.</span></dd></div>
+      <div><dt>223<small>MiB</small></dt><dd><span data-l="es" lang="es">la ventana con diez terminales y 10.000 líneas en cada una. Con un documento abierto, más: WebKit dibuja en tres procesos propios.</span><span data-l="en" lang="en">the window with ten terminals and 10,000 lines in each. With a document open, more: WebKit draws in three processes of its own.</span></dd></div>
+    </dl>
   </div>
+</section>
+
+<!-- ─────────────────────────────── back matter ─────────────────────────────── -->
+<section class="back" id="cli" aria-labelledby="cli-h">
+  <header>
+    <p class="label"><span data-l="es" lang="es">Apéndice A</span><span data-l="en" lang="en">Appendix A</span></p>
+    <h2 id="cli-h"><span data-l="es" lang="es">La línea de órdenes, para agentes y scripts</span><span data-l="en" lang="en">The command line, for agents and scripts</span></h2>
+  </header>
+  <div class="col">
+    <p data-l="es" lang="es">Una persona usa la ventana. Los agentes y los scripts usan <code>jmux</code>, y los agentes lo aprenden solos: la skill de jmux está en su propia lista de skills, y uno metido en un sandbox llega a lo mismo por MCP. <code>jmux &lt;orden&gt; --help</code> dice el resto.</p>
+    <p data-l="en" lang="en">A person uses the window. Agents and scripts use <code>jmux</code>, and agents learn it by themselves: the jmux skill sits in their own skill list, and one held in a sandbox reaches the same through MCP. <code>jmux &lt;command&gt; --help</code> says the rest.</p>
+    <div class="cli">
+      <h3><span data-l="es" lang="es">Sesiones</span><span data-l="en" lang="en">Sessions</span></h3>
+      <dl>
+        <dt>new</dt><dd><span data-l="es" lang="es">Crea una sesión: una shell, una orden, o Claude o Codex con <code>--claude</code> / <code>--codex</code>.</span><span data-l="en" lang="en">Create a session: a shell, a command, or Claude or Codex with <code>--claude</code> / <code>--codex</code>.</span></dd>
+        <dt>ls · tree</dt><dd><span data-l="es" lang="es">Las sesiones, y el mapa de proyectos, divisiones y pestañas.</span><span data-l="en" lang="en">The sessions, and the map of projects, splits and tabs.</span></dd>
+        <dt>read</dt><dd><span data-l="es" lang="es">Imprime la pantalla de una sesión.</span><span data-l="en" lang="en">Print a session's screen.</span></dd>
+        <dt>send · send-keys · prompt</dt><dd><span data-l="es" lang="es">Escribe texto, teclas con nombre, o un prompt al programa que está delante (con pegado entre corchetes según el modo).</span><span data-l="en" lang="en">Type text, named keys, or a prompt into the program in front (bracketed paste per the live mode).</span></dd>
+        <dt>wait</dt><dd><span data-l="es" lang="es">Espera a que una sesión se calle, a que su agente pare o a que salga.</span><span data-l="en" lang="en">Wait until a session goes quiet, its agent stops, or it exits.</span></dd>
+        <dt>rename · kill · clear</dt><dd><span data-l="es" lang="es">Nombra, termina o limpia una sesión.</span><span data-l="en" lang="en">Name, end or clear a session.</span></dd>
+      </dl>
+      <h3><span data-l="es" lang="es">Agentes e hijos</span><span data-l="en" lang="en">Agents and children</span></h3>
+      <dl>
+        <dt>spawn</dt><dd><span data-l="es" lang="es">Arranca un hijo, Claude o Codex, sobre una tarea, colgado de ti y nunca con más permiso que tú. Cuando termina, te llega su mensaje final.</span><span data-l="en" lang="en">Start a child, Claude or Codex, on a task, nested under you and never with more permission than you have. When it finishes, its final message reaches you.</span></dd>
+        <dt>self</dt><dd><span data-l="es" lang="es">Quién eres: tu sesión, tus padres, tus hijos y en qué está cada petición.</span><span data-l="en" lang="en">Who you are: your session, your parents, your children and where each request stands.</span></dd>
+        <dt>tell</dt><dd><span data-l="es" lang="es">Manda un mensaje al agente de otra sesión, como mensaje tuyo, nunca tecleado como si fuera su usuario.</span><span data-l="en" lang="en">Send a message to the agent in another session, as a message from you, never typed as its user.</span></dd>
+        <dt>result · conversation · diff</dt><dd><span data-l="es" lang="es">El texto final de un turno, una conversación entera, o lo que cambió un hijo.</span><span data-l="en" lang="en">A turn's final text, a whole conversation, or what a child changed.</span></dd>
+        <dt>review</dt><dd><span data-l="es" lang="es">Pide a los revisores de tu flujo que lean un cambio sin tocarlo.</span><span data-l="en" lang="en">Ask the reviewers your workflow names to read a change without touching it.</span></dd>
+        <dt>relay</dt><dd><span data-l="es" lang="es">Pasa una sesión que dirige a un sucesor, con su nota.</span><span data-l="en" lang="en">Hand an orchestrating session over to a successor, with its note.</span></dd>
+        <dt>interrupt · answer</dt><dd><span data-l="es" lang="es">Detiene el turno de un hijo; contesta la pregunta de un hijo de Claude, solo con Away.</span><span data-l="en" lang="en">Stop a child's turn; answer a Claude child's prompt, only while Away.</span></dd>
+        <dt>search</dt><dd><span data-l="es" lang="es">Busca en todas las conversaciones de Claude y Codex del Mac.</span><span data-l="en" lang="en">Search every Claude and Codex conversation on the Mac.</span></dd>
+      </dl>
+      <h3><span data-l="es" lang="es">El registro y el trabajo</span><span data-l="en" lang="en">The record and the work</span></h3>
+      <dl>
+        <dt>record</dt><dd><span data-l="es" lang="es">El índice de <code>.gg/</code>, una sección por su nombre, y su comprobación.</span><span data-l="en" lang="en">The outline of <code>.gg/</code>, a section by its name, and its check.</span></dd>
+        <dt>backlog</dt><dd><span data-l="es" lang="es">Apunta, edita, archiva o termina entradas; lee o fija Next.</span><span data-l="en" lang="en">Capture, edit, archive or finish entries; read or set Next.</span></dd>
+        <dt>work</dt><dd><span data-l="es" lang="es">Ata una sesión a sus entradas, o empieza el trabajo sobre una por su perfil.</span><span data-l="en" lang="en">Tie a session to its entries, or start work on one by its profile.</span></dd>
+        <dt>profile · workflow</dt><dd><span data-l="es" lang="es">Los perfiles, y el flujo propio de una sesión (un líder propone un cambio; la persona lo aplica).</span><span data-l="en" lang="en">The profiles, and a session's own workflow (a lead proposes a change; the person applies it).</span></dd>
+      </dl>
+      <h3><span data-l="es" lang="es">Reglas, instalación y el resto</span><span data-l="en" lang="en">Rules, install and the rest</span></h3>
+      <dl>
+        <dt>rules · settings</dt><dd><span data-l="es" lang="es">Las reglas de trabajo, y los ajustes con el fichero y la línea de donde sale cada valor.</span><span data-l="en" lang="en">The working rules, and the settings with the file and line each value comes from.</span></dd>
+        <dt>land · install</dt><dd><span data-l="es" lang="es">Aterriza una rama en main con su comprobación y despliega, o instala la versión de esta copia, como dejen las reglas. Nunca desde un hijo.</span><span data-l="en" lang="en">Land a branch on main with its check and deploy, or install this checkout's build, as the rules allow. Never from a child.</span></dd>
+        <dt>awake</dt><dd><span data-l="es" lang="es">Si jmux mantiene el Mac despierto, y quién lo está sujetando.</span><span data-l="en" lang="en">Whether jmux keeps the Mac awake, and who holds it.</span></dd>
+        <dt>project · layout</dt><dd><span data-l="es" lang="es">Los proyectos, para sincronizar Macs con un script; la disposición, como JSON.</span><span data-l="en" lang="en">The projects, for syncing Macs from a script; the layout, as JSON.</span></dd>
+        <dt>claude · codex</dt><dd><span data-l="es" lang="es">Instala o quita los hooks y la skill de cada agente.</span><span data-l="en" lang="en">Install or remove each agent's hooks and skill.</span></dd>
+        <dt>update · version</dt><dd><span data-l="es" lang="es">Cambia jmux.app por la última versión publicada, comprobada; dice qué versiones corren.</span><span data-l="en" lang="en">Replace jmux.app with the latest published release, checked; say which versions run.</span></dd>
+        <dt>mcp</dt><dd><span data-l="es" lang="es">Las herramientas de jmux por MCP, para un agente dentro de un sandbox.</span><span data-l="en" lang="en">jmux's tools over MCP, for an agent held in a sandbox.</span></dd>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<section class="back" id="install" aria-labelledby="install-h">
+  <header>
+    <p class="label"><span data-l="es" lang="es">Apéndice B</span><span data-l="en" lang="en">Appendix B</span></p>
+    <h2 id="install-h"><span data-l="es" lang="es">Cómo tenerlo</span><span data-l="en" lang="en">How to get it</span></h2>
+  </header>
+  <div class="col">
+    <p data-l="es" lang="es">jmux es, de momento, la herramienta de una persona: su repositorio es privado, y sus versiones también. Estos pasos son para quien tenga acceso. Necesitas macOS 14 o posterior en un Mac con Apple Silicon, Claude Code o Codex (o los dos), y <code>gh</code> con sesión iniciada; para el teléfono, Tailscale en el Mac y en el teléfono, con los certificados HTTPS activados en su consola.</p>
+    <p data-l="en" lang="en">jmux is, for now, one person's tool: its repository is private, and so are its releases. These steps are for whoever has access. You need macOS 14 or later on an Apple Silicon Mac, Claude Code or Codex (or both), and <code>gh</code> logged in; for the phone, Tailscale on the Mac and on the phone, with HTTPS certificates turned on in its admin console.</p>
+    <ol class="steps">
+      <li><span data-l="es" lang="es">Entra en GitHub con <code>gh</code>, una vez por Mac, con el permiso <code>repo</code>:</span><span data-l="en" lang="en">Log in to GitHub with <code>gh</code>, once per Mac, with the <code>repo</code> scope:</span><pre>gh auth login</pre></li>
+      <li><span data-l="es" lang="es">Descarga la última versión y ponla en Aplicaciones (<code>ditto</code> conserva la firma):</span><span data-l="en" lang="en">Download the latest release and put it in Applications (<code>ditto</code> keeps the signature):</span><pre>gh release download --repo javimoya/jmux --pattern 'jmux-*-macos-arm64.zip'
+ditto -x -k jmux-*-macos-arm64.zip /Applications</pre></li>
+      <li><span data-l="es" lang="es">Pon la línea de órdenes en tu PATH:</span><span data-l="en" lang="en">Put the command line on your PATH:</span><pre>sudo mkdir -p /usr/local/bin
+sudo ln -sfn /Applications/jmux.app/Contents/MacOS/jmux-cli /usr/local/bin/jmux</pre></li>
+      <li><span data-l="es" lang="es">Abre jmux. Un aviso te ofrecerá los hooks de Claude y de Codex; sin ellos, jmux no sabe en qué está cada agente.</span><span data-l="en" lang="en">Open jmux. A banner will offer the Claude and Codex hooks; without them, jmux cannot tell what each agent is doing.</span></li>
+    </ol>
+    <p data-l="es" lang="es">Las versiones no están notarizadas: un zip descargado con el navegador necesita una vez <code>xattr -dr com.apple.quarantine /Applications/jmux.app</code>. Con <code>gh</code> no hace falta. Instalado así, la app arranca su demonio al abrirse; <code>make install</code> desde el código fuente, además, lo deja arrancando con la sesión del Mac. A partir de ahí jmux se actualiza solo al abrirse.</p>
+    <p data-l="en" lang="en">Releases are not notarized: a zip downloaded with a browser needs <code>xattr -dr com.apple.quarantine /Applications/jmux.app</code> once. With <code>gh</code> it does not. Installed this way, the app starts its daemon when it opens; <code>make install</code> from the source also has it start at login. From then on jmux updates itself when it opens.</p>
+  </div>
+</section>
+
+<section class="back" id="colophon" aria-labelledby="colophon-h">
+  <header>
+    <p class="label"><span data-l="es" lang="es">Colofón</span><span data-l="en" lang="en">Colophon</span></p>
+    <h2 id="colophon-h"><span data-l="es" lang="es">Cómo está hecha esta página</span><span data-l="en" lang="en">How this page is made</span></h2>
+  </header>
+  <div class="col">
+    <p data-l="es" lang="es">Compuesta en Fraunces, de Undercase Type, y Newsreader, de Production Type, las dos bajo la SIL Open Font License y servidas desde aquí. Un fichero HTML, una hoja de estilo dentro de él y unas pocas líneas de JavaScript para el idioma, el tema y la hora de la cabecera; sin framework y sin nada que compilar, y tampoco hay rastreadores. Las capturas son WebP y cada una reserva su sitio antes de cargar.</p>
+    <p data-l="en" lang="en">Set in Fraunces, by Undercase Type, and Newsreader, by Production Type, both under the SIL Open Font License and served from here. One HTML file, a stylesheet inside it and a few lines of JavaScript for the language, the theme and the time in the running head; no framework and nothing to build, and no trackers either. The captures are WebP and each holds its place before it loads.</p>
+  </div>
+</section>
+
+<footer class="end">
+  <span><a class="mark" href="#top">jmux<i>.</i></a></span>
+  <span><span data-l="es" lang="es">Escrito y capturado en un Mac, con agentes de verdad.</span><span data-l="en" lang="en">Written and captured on a Mac, with real agents.</span></span>
+  <span class="tools">
+    <span class="switch" role="group" aria-label="Idioma / Language">
+      <button type="button" data-set-lang="es" lang="es">ES</button><span class="sep">/</span><button type="button" data-set-lang="en" lang="en">EN</button>
+    </span>
+    <span class="switch" role="group" aria-label="Tema / Theme">
+      <button type="button" data-set-theme="paper"><span data-l="es" lang="es">Papel</span><span data-l="en" lang="en">Paper</span></button><span class="sep">/</span><button type="button" data-set-theme="night"><span data-l="es" lang="es">Tinta</span><span data-l="en" lang="en">Ink</span></button><span class="sep">/</span><button type="button" data-set-theme="auto">Auto</button>
+    </span>
+  </span>
 </footer>
 
-<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Zoom"><img alt=""><p></p></div>
-<div class="toast mono" id="toast"></div>
-<div class="keys-help" id="keys-help" role="dialog" aria-modal="true" aria-label="Shortcuts"><div class="card"><h4 data-i="keys.title"></h4><table id="keys-table"></table></div></div>
-
-<script src="site.js"></script>
+<script src="site.js" defer></script>
 </body>
 </html>
